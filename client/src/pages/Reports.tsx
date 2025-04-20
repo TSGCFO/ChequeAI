@@ -11,51 +11,77 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 
 // Add hooks for each report type
 function useCustomerBalances() {
-  return useQuery({
+  return useQuery<any[]>({
     queryKey: ['/api/reports/customer-balances'],
-    queryFn: () => apiRequest('/api/reports/customer-balances'),
+    queryFn: async () => {
+      const response = await apiRequest('/api/reports/customer-balances');
+      return response || [];
+    }
   });
 }
 
 function useVendorBalances() {
-  return useQuery({
+  return useQuery<any[]>({
     queryKey: ['/api/reports/vendor-balances'],
-    queryFn: () => apiRequest('/api/reports/vendor-balances'),
+    queryFn: async () => {
+      const response = await apiRequest('/api/reports/vendor-balances');
+      return response || [];
+    }
   });
 }
 
 function useProfitByCustomer() {
-  return useQuery({
+  return useQuery<any[]>({
     queryKey: ['/api/reports/profit-by-customer'],
-    queryFn: () => apiRequest('/api/reports/profit-by-customer'),
+    queryFn: async () => {
+      const response = await apiRequest('/api/reports/profit-by-customer');
+      return response || [];
+    }
   });
 }
 
 function useProfitByVendor() {
-  return useQuery({
+  return useQuery<any[]>({
     queryKey: ['/api/reports/profit-by-vendor'],
-    queryFn: () => apiRequest('/api/reports/profit-by-vendor'),
+    queryFn: async () => {
+      const response = await apiRequest('/api/reports/profit-by-vendor');
+      return response || [];
+    }
   });
 }
 
 function useProfitSummary(period: 'daily' | 'weekly' | 'monthly') {
-  return useQuery({
+  return useQuery<any[]>({
     queryKey: ['/api/reports/profit-summary', period],
-    queryFn: () => apiRequest(`/api/reports/profit-summary/${period}`),
+    queryFn: async () => {
+      try {
+        const response = await apiRequest(`/api/reports/profit-summary/${period}`);
+        return response || [];
+      } catch (error) {
+        console.error(`Error fetching profit summary for ${period}:`, error);
+        return [];
+      }
+    }
   });
 }
 
 function useOutstandingBalances() {
-  return useQuery({
+  return useQuery<any[]>({
     queryKey: ['/api/reports/outstanding-balances'],
-    queryFn: () => apiRequest('/api/reports/outstanding-balances'),
+    queryFn: async () => {
+      const response = await apiRequest('/api/reports/outstanding-balances');
+      return response || [];
+    }
   });
 }
 
 function useTransactionStatus() {
-  return useQuery({
+  return useQuery<any[]>({
     queryKey: ['/api/reports/transaction-status'],
-    queryFn: () => apiRequest('/api/reports/transaction-status'),
+    queryFn: async () => {
+      const response = await apiRequest('/api/reports/transaction-status');
+      return response || [];
+    }
   });
 }
 
@@ -155,8 +181,8 @@ export default function Reports() {
                       <TableBody>
                         {profitSummary.map((item: any, index: number) => (
                           <TableRow key={index}>
-                            <TableCell>{item.date || item.week || item.month}</TableCell>
-                            <TableCell>${parseFloat(item.profit).toFixed(2)}</TableCell>
+                            <TableCell>{new Date(item.date || item.week || item.month).toLocaleDateString()}</TableCell>
+                            <TableCell>${parseFloat(item.total_potential_profit || item.profit || "0").toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -298,9 +324,9 @@ export default function Reports() {
                       {customerBalances.map((item: any) => (
                         <TableRow key={item.customer_id}>
                           <TableCell className="font-medium">{item.customer_name}</TableCell>
-                          <TableCell>${parseFloat(item.total_owed).toFixed(2)}</TableCell>
-                          <TableCell>${parseFloat(item.total_paid).toFixed(2)}</TableCell>
-                          <TableCell>${parseFloat(item.balance).toFixed(2)}</TableCell>
+                          <TableCell>${parseFloat(item.total_owed || "0").toFixed(2)}</TableCell>
+                          <TableCell>${parseFloat(item.total_paid || "0").toFixed(2)}</TableCell>
+                          <TableCell>${parseFloat(item.remaining_balance || item.balance || "0").toFixed(2)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -379,9 +405,9 @@ export default function Reports() {
                       {vendorBalances.map((item: any) => (
                         <TableRow key={item.vendor_id}>
                           <TableCell className="font-medium">{item.vendor_name}</TableCell>
-                          <TableCell>${parseFloat(item.total_receivable).toFixed(2)}</TableCell>
-                          <TableCell>${parseFloat(item.total_received).toFixed(2)}</TableCell>
-                          <TableCell>${parseFloat(item.balance).toFixed(2)}</TableCell>
+                          <TableCell>${parseFloat(item.total_to_receive || item.total_receivable || "0").toFixed(2)}</TableCell>
+                          <TableCell>${parseFloat(item.total_received || "0").toFixed(2)}</TableCell>
+                          <TableCell>${parseFloat(item.pending_amount || item.balance || "0").toFixed(2)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -465,29 +491,39 @@ export default function Reports() {
                         <TableRow key={item.transaction_id}>
                           <TableCell>{new Date(item.date).toLocaleDateString()}</TableCell>
                           <TableCell>{item.cheque_number}</TableCell>
-                          <TableCell>${parseFloat(item.cheque_amount).toFixed(2)}</TableCell>
+                          <TableCell>${parseFloat(item.cheque_amount || item.amount || "0").toFixed(2)}</TableCell>
                           <TableCell>{item.customer_name}</TableCell>
                           <TableCell>{item.vendor_name}</TableCell>
                           <TableCell>
                             <span className={`px-2 py-1 rounded-full text-xs 
-                              ${item.status === 'completed' ? 'bg-green-100 text-green-800' : 
-                                item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                              ${(item.status === 'completed' || item.status === 'Completed') ? 'bg-green-100 text-green-800' : 
+                                (item.status === 'pending' || item.status === 'Pending') ? 'bg-yellow-100 text-yellow-800' : 
                                 'bg-red-100 text-red-800'}`}>
-                              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                              {typeof item.status === 'string' ? 
+                                (item.status.charAt(0).toUpperCase() + item.status.slice(1).toLowerCase()) : 
+                                'Unknown'}
                             </span>
                           </TableCell>
                           <TableCell>
                             <span className={`px-2 py-1 rounded-full text-xs
-                              ${item.customer_payment_status === 'Fully Paid' ? 'bg-green-100 text-green-800' : 
+                              ${(item.customer_payment_status === 'Fully Paid' || 
+                                 parseFloat(item.customer_paid || "0") >= parseFloat(item.customer_amount || "0")) ? 
+                                'bg-green-100 text-green-800' : 
                                 'bg-yellow-100 text-yellow-800'}`}>
-                              {item.customer_payment_status}
+                              {item.customer_payment_status || 
+                                (parseFloat(item.customer_paid || "0") >= parseFloat(item.customer_amount || "0") ? 
+                                 'Fully Paid' : 'Partially Paid')}
                             </span>
                           </TableCell>
                           <TableCell>
                             <span className={`px-2 py-1 rounded-full text-xs
-                              ${item.vendor_payment_status === 'Fully Received' ? 'bg-green-100 text-green-800' : 
+                              ${(item.vendor_payment_status === 'Fully Received' || 
+                                 parseFloat(item.vendor_received || "0") >= parseFloat(item.vendor_amount || "0")) ? 
+                                'bg-green-100 text-green-800' : 
                                 'bg-yellow-100 text-yellow-800'}`}>
-                              {item.vendor_payment_status}
+                              {item.vendor_payment_status || 
+                                (parseFloat(item.vendor_received || "0") >= parseFloat(item.vendor_amount || "0") ? 
+                                 'Fully Received' : 'Partially Received')}
                             </span>
                           </TableCell>
                         </TableRow>
