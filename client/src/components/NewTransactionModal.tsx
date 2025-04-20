@@ -60,51 +60,60 @@ export default function NewTransactionModal({ isOpen, onClose }: NewTransactionM
     defaultValues,
   });
 
-  const watchValues = form.watch();
-
+  // Setup a subscription to watch form changes
   useEffect(() => {
-    // Calculate fees and profits when form values change
-    const calculateFees = () => {
-      const customerId = parseInt(watchValues.customer_id);
-      const vendorId = watchValues.vendor_id;
-      const chequeAmount = parseFloat(watchValues.cheque_amount || "0");
-
-      if (!customerId || !vendorId || isNaN(chequeAmount) || chequeAmount <= 0) {
+    // Subscribe to form changes
+    const subscription = form.watch((value, { name }) => {
+      // Only recalculate if relevant fields change
+      if (['customer_id', 'vendor_id', 'cheque_amount'].includes(name || '')) {
+        const formValues = form.getValues();
+        const customerId = parseInt(formValues.customer_id || '0');
+        const vendorId = formValues.vendor_id;
+        const chequeAmount = parseFloat(formValues.cheque_amount || '0');
+        
+        if (!customerId || !vendorId || isNaN(chequeAmount) || chequeAmount <= 0) {
+          setPreviewCalculations({
+            customerFee: 0,
+            netPayableToCustomer: 0,
+            vendorFee: 0,
+            amountFromVendor: 0,
+            estimatedProfit: 0,
+          });
+          return;
+        }
+        
+        // Find the customer and vendor
+        const customer = Array.isArray(customers) 
+          ? customers.find(c => c.customer_id === customerId) 
+          : null;
+        const vendor = Array.isArray(vendors)
+          ? vendors.find(v => v.vendor_id === vendorId)
+          : null;
+          
+        if (!customer || !vendor) return;
+        
+        // Calculate fees
+        const customerFeePercentage = parseFloat(customer.fee_percentage?.toString() || '0');
+        const vendorFeePercentage = parseFloat(vendor.fee_percentage?.toString() || '0');
+        
+        const customerFee = chequeAmount * (customerFeePercentage / 100);
+        const netPayableToCustomer = chequeAmount - customerFee;
+        const vendorFee = chequeAmount * (vendorFeePercentage / 100);
+        const amountFromVendor = chequeAmount - vendorFee;
+        const estimatedProfit = customerFee - vendorFee;
+        
         setPreviewCalculations({
-          customerFee: 0,
-          netPayableToCustomer: 0,
-          vendorFee: 0,
-          amountFromVendor: 0,
-          estimatedProfit: 0,
+          customerFee,
+          netPayableToCustomer,
+          vendorFee,
+          amountFromVendor,
+          estimatedProfit,
         });
-        return;
       }
-
-      const customer = customers?.find(c => c.customer_id === customerId);
-      const vendor = vendors?.find(v => v.vendor_id === vendorId);
-
-      if (!customer || !vendor) return;
-
-      const customerFeePercentage = parseFloat(customer.fee_percentage.toString());
-      const vendorFeePercentage = parseFloat(vendor.fee_percentage.toString());
-
-      const customerFee = chequeAmount * (customerFeePercentage / 100);
-      const netPayableToCustomer = chequeAmount - customerFee;
-      const vendorFee = chequeAmount * (vendorFeePercentage / 100);
-      const amountFromVendor = chequeAmount - vendorFee;
-      const estimatedProfit = customerFee - vendorFee;
-
-      setPreviewCalculations({
-        customerFee,
-        netPayableToCustomer,
-        vendorFee,
-        amountFromVendor,
-        estimatedProfit,
-      });
-    };
-
-    calculateFees();
-  }, [watchValues, customers, vendors]);
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [form, customers, vendors]);
 
   const onSubmit = async (data: TransactionFormValues) => {
     try {

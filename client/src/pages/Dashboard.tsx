@@ -10,6 +10,7 @@ import NewTransactionModal from "@/components/NewTransactionModal";
 import useTransactions from "@/hooks/useTransactions";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { BusinessSummary } from "../../shared/schema";
 
 export default function Dashboard() {
   const [showDocModal, setShowDocModal] = useState(false);
@@ -20,7 +21,7 @@ export default function Dashboard() {
   const { toast } = useToast();
 
   const { data: transactions, isLoading, isError } = useTransactions();
-  const { data: summary, isLoading: isSummaryLoading } = useTransactions({ summary: true });
+  const { data: summary, isLoading: isSummaryLoading } = useTransactions({ summary: true }) as { data: BusinessSummary | undefined, isLoading: boolean };
 
   const filteredTransactions = Array.isArray(transactions) 
     ? transactions.filter(

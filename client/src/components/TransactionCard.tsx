@@ -11,7 +11,9 @@ interface TransactionCardProps {
 
 export default function TransactionCard({ transaction }: TransactionCardProps) {
   // Function to get the appropriate status badge
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string | null) => {
+    if (!status) return <Badge className="bg-gray-100 text-gray-600">Unknown</Badge>;
+    
     switch (status) {
       case "completed":
         return <Badge className="bg-green-100 text-green-600">Completed</Badge>;
