@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Paperclip, Send, Info, X, Settings, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,41 +106,104 @@ export default function ChatInterface({ onClose }: ChatInterfaceProps) {
     }
   };
 
-  // Helper function to render transaction examples within AI messages
+  // Helper function to render message content with proper formatting
   const renderMessageContent = (content: string) => {
-    // Very basic check for JSON-like structures to render as transaction lists
-    if (content.includes("Cheque #") && content.includes("$") && content.includes("transactions")) {
-      const parts = content.split(/(\{.*?\})/gs);
-      
-      return parts.map((part, idx) => {
-        if (part.startsWith("{") && part.endsWith("}")) {
-          try {
-            // This is a simplified approach - in a real app, you'd want more robust parsing
-            return (
-              <div key={idx} className="mt-3 divide-y divide-gray-200 rounded-md border border-gray-200">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center justify-between bg-white p-2 text-xs">
-                    <div>
-                      <p className="font-medium">Cheque #{43000 + i * 100 + idx}</p>
-                      <p className="text-gray-500">May {i + 1}, 2023</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">${(1000 + i * 500).toFixed(2)}</p>
-                      <p className="text-green-600">Completed</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          } catch (e) {
-            return part;
-          }
-        }
-        return part;
-      });
+    // Process line breaks for better formatting
+    let formattedContent = content;
+    
+    // Format numbered or bulleted lists
+    if (content.includes("\n-") || content.match(/\n\d+\./)) {
+      return (
+        <>
+          {content.split('\n').map((line, index) => {
+            // Check if line is a bullet point or numbered item
+            if (line.startsWith('- ') || line.match(/^\d+\./)) {
+              return (
+                <div key={index} className="flex items-start my-1">
+                  <span className="mr-2">{line.startsWith('- ') ? '•' : line.split('.')[0] + '.'}</span>
+                  <span>{line.replace(/^- /, '').replace(/^\d+\.\s*/, '')}</span>
+                </div>
+              );
+            }
+            // Handle section headers (often used in AI responses)
+            else if (line.endsWith(':') && line.length < 50) {
+              return <p key={index} className="font-semibold mt-2 mb-1">{line}</p>;
+            }
+            // Regular text
+            else if (line.trim()) {
+              return <p key={index} className="my-1">{line}</p>;
+            }
+            // Empty line as spacing
+            else {
+              return <div key={index} className="h-2"></div>;
+            }
+          })}
+        </>
+      );
     }
     
-    return content;
+    // Try to detect and format transaction data
+    if (content.includes("transaction") && 
+        (content.includes("cheque") || content.includes("Cheque"))) {
+      try {
+        // First try to find and parse structured transaction data
+        const transactionMatch = content.match(/```json\n([\s\S]*?)\n```/);
+        
+        if (transactionMatch && transactionMatch[1]) {
+          const transactionData = JSON.parse(transactionMatch[1]);
+          
+          // Replace the JSON code block with a nicely formatted transaction card
+          formattedContent = content.replace(/```json\n[\s\S]*?\n```/, 
+            '<div class="transaction-placeholder"></div>');
+          
+          return (
+            <>
+              {formattedContent.split('<div class="transaction-placeholder"></div>').map((part, idx, arr) => (
+                <React.Fragment key={`part-${idx}`}>
+                  {part}
+                  {idx < arr.length - 1 && (
+                    <div className="mt-3 divide-y divide-gray-200 rounded-md border border-gray-200 bg-white">
+                      <div className="flex items-center justify-between p-3 text-sm">
+                        <div>
+                          <p className="font-medium">
+                            Cheque #{transactionData.chequeNumber || transactionData.transaction_id || "N/A"}
+                          </p>
+                          <p className="text-gray-500">
+                            {transactionData.date || new Date().toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">
+                            ${parseFloat(transactionData.amount || "0").toFixed(2)}
+                          </p>
+                          <p className={
+                            transactionData.status === "Completed" ? "text-green-600" : 
+                            transactionData.status === "Pending" ? "text-yellow-600" : "text-gray-600"
+                          }>
+                            {transactionData.status || "Pending"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </React.Fragment>
+              ))}
+            </>
+          );
+        }
+      } catch (e) {
+        console.error("Error formatting transaction data:", e);
+      }
+    }
+    
+    // Default: return with line breaks preserved
+    return (
+      <>
+        {formattedContent.split('\n').map((line, index) => (
+          <p key={index} className={line.trim() ? 'my-1' : 'h-2'}>{line}</p>
+        ))}
+      </>
+    );
   };
 
   return (
