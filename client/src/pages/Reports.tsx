@@ -14,8 +14,17 @@ function useCustomerBalances() {
   return useQuery<any[]>({
     queryKey: ['/api/reports/customer-balances'],
     queryFn: async () => {
-      const response = await apiRequest('/api/reports/customer-balances');
-      return response || [];
+      try {
+        const response = await fetch('/api/reports/customer-balances');
+        if (!response.ok) {
+          throw new Error(`Error fetching customer balances: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data || [];
+      } catch (error) {
+        console.error("Error fetching customer balances:", error);
+        return [];
+      }
     }
   });
 }
@@ -24,8 +33,17 @@ function useVendorBalances() {
   return useQuery<any[]>({
     queryKey: ['/api/reports/vendor-balances'],
     queryFn: async () => {
-      const response = await apiRequest('/api/reports/vendor-balances');
-      return response || [];
+      try {
+        const response = await fetch('/api/reports/vendor-balances');
+        if (!response.ok) {
+          throw new Error(`Error fetching vendor balances: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data || [];
+      } catch (error) {
+        console.error("Error fetching vendor balances:", error);
+        return [];
+      }
     }
   });
 }
@@ -34,8 +52,17 @@ function useProfitByCustomer() {
   return useQuery<any[]>({
     queryKey: ['/api/reports/profit-by-customer'],
     queryFn: async () => {
-      const response = await apiRequest('/api/reports/profit-by-customer');
-      return response || [];
+      try {
+        const response = await fetch('/api/reports/profit-by-customer');
+        if (!response.ok) {
+          throw new Error(`Error fetching profit by customer: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data || [];
+      } catch (error) {
+        console.error("Error fetching profit by customer:", error);
+        return [];
+      }
     }
   });
 }
@@ -44,8 +71,17 @@ function useProfitByVendor() {
   return useQuery<any[]>({
     queryKey: ['/api/reports/profit-by-vendor'],
     queryFn: async () => {
-      const response = await apiRequest('/api/reports/profit-by-vendor');
-      return response || [];
+      try {
+        const response = await fetch('/api/reports/profit-by-vendor');
+        if (!response.ok) {
+          throw new Error(`Error fetching profit by vendor: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data || [];
+      } catch (error) {
+        console.error("Error fetching profit by vendor:", error);
+        return [];
+      }
     }
   });
 }
@@ -55,8 +91,12 @@ function useProfitSummary(period: 'daily' | 'weekly' | 'monthly') {
     queryKey: ['/api/reports/profit-summary', period],
     queryFn: async () => {
       try {
-        const response = await apiRequest(`/api/reports/profit-summary/${period}`);
-        return response || [];
+        const response = await fetch(`/api/reports/profit-summary/${period}`);
+        if (!response.ok) {
+          throw new Error(`Error fetching profit summary: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data || [];
       } catch (error) {
         console.error(`Error fetching profit summary for ${period}:`, error);
         return [];
@@ -69,8 +109,17 @@ function useOutstandingBalances() {
   return useQuery<any[]>({
     queryKey: ['/api/reports/outstanding-balances'],
     queryFn: async () => {
-      const response = await apiRequest('/api/reports/outstanding-balances');
-      return response || [];
+      try {
+        const response = await fetch('/api/reports/outstanding-balances');
+        if (!response.ok) {
+          throw new Error(`Error fetching outstanding balances: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data || [];
+      } catch (error) {
+        console.error("Error fetching outstanding balances:", error);
+        return [];
+      }
     }
   });
 }
@@ -79,8 +128,17 @@ function useTransactionStatus() {
   return useQuery<any[]>({
     queryKey: ['/api/reports/transaction-status'],
     queryFn: async () => {
-      const response = await apiRequest('/api/reports/transaction-status');
-      return response || [];
+      try {
+        const response = await fetch('/api/reports/transaction-status');
+        if (!response.ok) {
+          throw new Error(`Error fetching transaction status: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data || [];
+      } catch (error) {
+        console.error("Error fetching transaction status:", error);
+        return [];
+      }
     }
   });
 }
