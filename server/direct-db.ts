@@ -75,6 +75,24 @@ export async function getTransactions() {
  */
 export async function getBusinessSummary() {
   try {
+    // First try to get from business_summary view if it exists
+    try {
+      const summaryResult = await pool.query('SELECT * FROM business_summary LIMIT 1');
+      if (summaryResult.rows && summaryResult.rows.length > 0) {
+        const summary = summaryResult.rows[0];
+        return {
+          totalTransactions: parseInt(summary.total_transactions) || 0,
+          totalAmount: summary.total_cheque_amount ? parseFloat(summary.total_cheque_amount).toFixed(2) : "0.00",
+          totalProfit: summary.total_potential_profit ? parseFloat(summary.total_potential_profit).toFixed(2) : "0.00",
+          outstandingBalance: summary.total_outstanding_to_customers ? parseFloat(summary.total_outstanding_to_customers).toFixed(2) : "0.00",
+          pendingTransactions: 0, // Not available in the view
+          completedTransactions: 0 // Not available in the view
+        };
+      }
+    } catch (viewError) {
+      console.log("Could not get business summary from view, calculating manually");
+    }
+
     // Get total transactions
     const transactionCountResult = await pool.query('SELECT COUNT(*) FROM cheque_transactions');
     const totalTransactions = parseInt(transactionCountResult.rows[0].count) || 0;
@@ -87,23 +105,24 @@ export async function getBusinessSummary() {
     const totalProfitResult = await pool.query('SELECT SUM(profit) FROM cheque_transactions');
     const totalProfit = totalProfitResult.rows[0].sum ? parseFloat(totalProfitResult.rows[0].sum).toFixed(2) : "0.00";
 
-    // Get outstanding balance (pending transactions)
+    // Get outstanding balance (using net_payable_to_customer - paid_to_customer)
     const outstandingBalanceResult = await pool.query(
-      "SELECT SUM(cheque_amount) FROM cheque_transactions WHERE status = 'pending'"
+      "SELECT SUM(net_payable_to_customer - COALESCE(paid_to_customer, 0)) FROM cheque_transactions"
     );
     const outstandingBalance = outstandingBalanceResult.rows[0].sum 
       ? parseFloat(outstandingBalanceResult.rows[0].sum).toFixed(2)
       : "0.00";
 
-    // Get pending transaction count
+    // Since there's no status column, we'll calculate based on payment status
+    // Get "pending" transaction count (not fully paid to customer)
     const pendingCountResult = await pool.query(
-      "SELECT COUNT(*) FROM cheque_transactions WHERE status = 'pending'"
+      "SELECT COUNT(*) FROM cheque_transactions WHERE net_payable_to_customer > COALESCE(paid_to_customer, 0)"
     );
     const pendingTransactions = parseInt(pendingCountResult.rows[0].count) || 0;
 
-    // Get completed transaction count
+    // Get "completed" transaction count (fully paid to customer)
     const completedCountResult = await pool.query(
-      "SELECT COUNT(*) FROM cheque_transactions WHERE status = 'completed'"
+      "SELECT COUNT(*) FROM cheque_transactions WHERE net_payable_to_customer <= COALESCE(paid_to_customer, 0)"
     );
     const completedTransactions = parseInt(completedCountResult.rows[0].count) || 0;
 
