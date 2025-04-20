@@ -183,8 +183,8 @@ async function handleNewTransactionCommand(
 {
   "transaction_id": ${transaction.transaction_id},
   "chequeNumber": "${transaction.cheque_number}",
-  "amount": "${transaction.cheque_amount}",
-  "date": "${transaction.date ? new Date(transaction.date).toLocaleDateString() : 'N/A'}",
+  "chequeAmount": "${transaction.cheque_amount}",
+  "date": "${transaction.date ? new Date(transaction.date.toString()).toLocaleDateString() : 'N/A'}",
   "status": "${transaction.status || 'Pending'}"
 }
 \`\`\`

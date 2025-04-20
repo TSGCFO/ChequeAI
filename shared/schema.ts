@@ -90,6 +90,7 @@ export const insertVendorSchema = createInsertSchema(vendors).omit({
 });
 
 export const insertTransactionSchema = createInsertSchema(chequeTransactions).omit({ 
+  transaction_id: true, // Auto-generated field
   created_at: true,
   updated_at: true,
   customer_fee: true,
