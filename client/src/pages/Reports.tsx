@@ -238,7 +238,7 @@ export default function Reports() {
                       </TableHeader>
                       <TableBody>
                         {profitSummary.map((item: any, index: number) => (
-                          <TableRow key={index}>
+                          <TableRow key={`profit-summary-${index}-${item.date || item.week || item.month}`}>
                             <TableCell>{new Date(item.date || item.week || item.month).toLocaleDateString()}</TableCell>
                             <TableCell>${parseFloat(item.total_potential_profit || item.profit || "0").toFixed(2)}</TableCell>
                           </TableRow>
@@ -275,15 +275,15 @@ export default function Reports() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {outstandingBalances.map((item: any) => (
-                          <TableRow key={item.transaction_id}>
+                        {outstandingBalances.map((item: any, index: number) => (
+                          <TableRow key={`outstanding-balance-${index}-${item.cheque_number || item.transaction_id || ''}`}>
                             <TableCell>{item.cheque_number}</TableCell>
                             <TableCell>{item.customer_name}</TableCell>
                             <TableCell>{item.vendor_name}</TableCell>
                             <TableCell>
-                              {parseFloat(item.customer_outstanding) > 0 ? 
-                                `$${parseFloat(item.customer_outstanding).toFixed(2)} (to customer)` : 
-                                `$${parseFloat(item.vendor_outstanding).toFixed(2)} (from vendor)`}
+                              {parseFloat(item.customer_outstanding || "0") > 0 ? 
+                                `$${parseFloat(item.customer_outstanding || "0").toFixed(2)} (to customer)` : 
+                                `$${parseFloat(item.vendor_outstanding || "0").toFixed(2)} (from vendor)`}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -545,8 +545,8 @@ export default function Reports() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {transactionStatus.map((item: any) => (
-                        <TableRow key={item.transaction_id}>
+                      {transactionStatus.map((item: any, index: number) => (
+                        <TableRow key={`transaction-status-${index}-${item.transaction_id || item.cheque_number || ''}`}>
                           <TableCell>{new Date(item.date).toLocaleDateString()}</TableCell>
                           <TableCell>{item.cheque_number}</TableCell>
                           <TableCell>${parseFloat(item.cheque_amount || item.amount || "0").toFixed(2)}</TableCell>
