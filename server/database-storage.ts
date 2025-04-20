@@ -21,41 +21,39 @@ export class DatabaseStorage implements IStorage {
     vendorId?: string;
     status?: string;
   }): Promise<ChequeTransaction[]> {
-    let query = db.select().from(chequeTransactions);
-    
-    const conditions = [];
-    
-    // Apply filters
-    if (options?.customerId) {
-      conditions.push(eq(chequeTransactions.customer_id, options.customerId));
-    }
+    try {
+      let baseQuery = db.select().from(chequeTransactions);
+      
+      // Apply filters individually instead of using and()
+      if (options?.customerId) {
+        baseQuery = baseQuery.where(eq(chequeTransactions.customer_id, options.customerId));
+      }
 
-    if (options?.vendorId) {
-      conditions.push(eq(chequeTransactions.vendor_id, options.vendorId));
-    }
+      if (options?.vendorId) {
+        baseQuery = baseQuery.where(eq(chequeTransactions.vendor_id, options.vendorId));
+      }
 
-    if (options?.status) {
-      conditions.push(eq(chequeTransactions.status, options.status));
-    }
-    
-    // Apply all conditions
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
+      if (options?.status) {
+        baseQuery = baseQuery.where(eq(chequeTransactions.status, options.status));
+      }
 
-    // Apply pagination
-    if (options?.limit) {
-      query = query.limit(options.limit);
+      // Apply pagination
+      if (options?.limit) {
+        baseQuery = baseQuery.limit(options.limit);
+      }
+
+      if (options?.offset) {
+        baseQuery = baseQuery.offset(options.offset || 0);
+      }
+
+      // Order by latest first
+      baseQuery = baseQuery.orderBy(desc(chequeTransactions.date));
+
+      return await baseQuery;
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+      return [];
     }
-
-    if (options?.offset) {
-      query = query.offset(options.offset || 0);
-    }
-
-    // Order by latest first
-    query = query.orderBy(desc(chequeTransactions.date));
-
-    return await query;
   }
 
   async getTransaction(id: number): Promise<ChequeTransaction | undefined> {
@@ -261,10 +259,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAIConversationHistory(conversationId: string): Promise<AIMessage[]> {
-    return await db
-      .select()
-      .from(aiMessages)
-      .where(eq(aiMessages.conversation_id, conversationId))
-      .orderBy(aiMessages.timestamp);
+    try {
+      // Fix the query to use the correct column name for timestamp
+      return await db
+        .select()
+        .from(aiMessages)
+        .where(eq(aiMessages.conversation_id, conversationId))
+        .orderBy(aiMessages.created_at);
+    } catch (error) {
+      console.error("Error retrieving AI conversation history:", error);
+      return []; // Return empty array instead of throwing to prevent app crashes
+    }
   }
 }
