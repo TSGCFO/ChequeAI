@@ -1,0 +1,270 @@
+import { 
+  customers, vendors, chequeTransactions,
+  customerDeposits, vendorPayments, aiMessages,
+  type Customer, type Vendor, type ChequeTransaction, 
+  type CustomerDeposit, type VendorPayment, type AIMessage,
+  type InsertCustomer, type InsertVendor, type InsertTransaction, 
+  type InsertCustomerDeposit, type InsertVendorPayment, type InsertAIMessage,
+  type TransactionWithDetails, type BusinessSummary
+} from "@shared/schema";
+
+import { db } from "./db";
+import { eq, and, desc, sql, count, sum } from "drizzle-orm";
+import { IStorage } from "./storage";
+
+export class DatabaseStorage implements IStorage {
+  // Transaction methods
+  async getTransactions(options?: {
+    limit?: number;
+    offset?: number;
+    customerId?: number;
+    vendorId?: string;
+    status?: string;
+  }): Promise<ChequeTransaction[]> {
+    let query = db.select().from(chequeTransactions);
+    
+    const conditions = [];
+    
+    // Apply filters
+    if (options?.customerId) {
+      conditions.push(eq(chequeTransactions.customer_id, options.customerId));
+    }
+
+    if (options?.vendorId) {
+      conditions.push(eq(chequeTransactions.vendor_id, options.vendorId));
+    }
+
+    if (options?.status) {
+      conditions.push(eq(chequeTransactions.status, options.status));
+    }
+    
+    // Apply all conditions
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+
+    // Apply pagination
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+
+    if (options?.offset) {
+      query = query.offset(options.offset || 0);
+    }
+
+    // Order by latest first
+    query = query.orderBy(desc(chequeTransactions.date));
+
+    return await query;
+  }
+
+  async getTransaction(id: number): Promise<ChequeTransaction | undefined> {
+    const [transaction] = await db
+      .select()
+      .from(chequeTransactions)
+      .where(eq(chequeTransactions.transaction_id, id));
+    
+    return transaction;
+  }
+
+  async getTransactionWithDetails(id: number): Promise<TransactionWithDetails | undefined> {
+    const result = await db
+      .select({
+        ...chequeTransactions,
+        customer: {
+          customer_name: customers.customer_name
+        },
+        vendor: {
+          vendor_name: vendors.vendor_name
+        }
+      })
+      .from(chequeTransactions)
+      .leftJoin(customers, eq(chequeTransactions.customer_id, customers.customer_id))
+      .leftJoin(vendors, eq(chequeTransactions.vendor_id, vendors.vendor_id))
+      .where(eq(chequeTransactions.transaction_id, id));
+    
+    if (result.length === 0) return undefined;
+    return result[0] as unknown as TransactionWithDetails;
+  }
+
+  async createTransaction(transaction: InsertTransaction): Promise<ChequeTransaction> {
+    const [result] = await db
+      .insert(chequeTransactions)
+      .values(transaction)
+      .returning();
+    
+    return result;
+  }
+
+  async updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<ChequeTransaction | undefined> {
+    const [result] = await db
+      .update(chequeTransactions)
+      .set(transaction)
+      .where(eq(chequeTransactions.transaction_id, id))
+      .returning();
+    
+    return result;
+  }
+
+  async deleteTransaction(id: number): Promise<boolean> {
+    const result = await db
+      .delete(chequeTransactions)
+      .where(eq(chequeTransactions.transaction_id, id))
+      .returning();
+    
+    return result.length > 0;
+  }
+
+  // Customer methods
+  async getCustomers(): Promise<Customer[]> {
+    return await db.select().from(customers);
+  }
+
+  async getCustomer(id: number): Promise<Customer | undefined> {
+    const [customer] = await db
+      .select()
+      .from(customers)
+      .where(eq(customers.customer_id, id));
+    
+    return customer;
+  }
+
+  async createCustomer(customer: InsertCustomer): Promise<Customer> {
+    const [result] = await db
+      .insert(customers)
+      .values(customer)
+      .returning();
+    
+    return result;
+  }
+
+  async updateCustomer(id: number, customer: Partial<InsertCustomer>): Promise<Customer | undefined> {
+    const [result] = await db
+      .update(customers)
+      .set(customer)
+      .where(eq(customers.customer_id, id))
+      .returning();
+    
+    return result;
+  }
+
+  async deleteCustomer(id: number): Promise<boolean> {
+    const result = await db
+      .delete(customers)
+      .where(eq(customers.customer_id, id))
+      .returning();
+    
+    return result.length > 0;
+  }
+
+  // Vendor methods
+  async getVendors(): Promise<Vendor[]> {
+    return await db.select().from(vendors);
+  }
+
+  async getVendor(id: string): Promise<Vendor | undefined> {
+    const [vendor] = await db
+      .select()
+      .from(vendors)
+      .where(eq(vendors.vendor_id, id));
+    
+    return vendor;
+  }
+
+  async createVendor(vendor: InsertVendor): Promise<Vendor> {
+    const [result] = await db
+      .insert(vendors)
+      .values(vendor)
+      .returning();
+    
+    return result;
+  }
+
+  async updateVendor(id: string, vendor: Partial<InsertVendor>): Promise<Vendor | undefined> {
+    const [result] = await db
+      .update(vendors)
+      .set(vendor)
+      .where(eq(vendors.vendor_id, id))
+      .returning();
+    
+    return result;
+  }
+
+  async deleteVendor(id: string): Promise<boolean> {
+    const result = await db
+      .delete(vendors)
+      .where(eq(vendors.vendor_id, id))
+      .returning();
+    
+    return result.length > 0;
+  }
+
+  // Business summary
+  async getBusinessSummary(): Promise<BusinessSummary> {
+    // Get total transactions count
+    const [transactionCount] = await db
+      .select({ count: count() })
+      .from(chequeTransactions);
+
+    // Get total amount processed
+    const [totalAmountResult] = await db
+      .select({ sum: sum(chequeTransactions.cheque_amount) })
+      .from(chequeTransactions);
+
+    // Get total profit
+    const [totalProfitResult] = await db
+      .select({ sum: sum(chequeTransactions.profit) })
+      .from(chequeTransactions);
+
+    // Get outstanding balance (transactions marked as pending)
+    const [outstandingBalanceResult] = await db
+      .select({ sum: sum(chequeTransactions.cheque_amount) })
+      .from(chequeTransactions)
+      .where(eq(chequeTransactions.status, 'pending'));
+
+    // Get pending and completed transaction counts
+    const [pendingCount] = await db
+      .select({ count: count() })
+      .from(chequeTransactions)
+      .where(eq(chequeTransactions.status, 'pending'));
+
+    const [completedCount] = await db
+      .select({ count: count() })
+      .from(chequeTransactions)
+      .where(eq(chequeTransactions.status, 'completed'));
+
+    // Format currency values
+    const totalAmount = totalAmountResult.sum ? parseFloat(totalAmountResult.sum.toString()).toFixed(2) : "0.00";
+    const totalProfit = totalProfitResult.sum ? parseFloat(totalProfitResult.sum.toString()).toFixed(2) : "0.00";
+    const outstandingBalance = outstandingBalanceResult.sum 
+      ? parseFloat(outstandingBalanceResult.sum.toString()).toFixed(2) 
+      : "0.00";
+
+    return {
+      totalTransactions: transactionCount.count,
+      totalAmount,
+      totalProfit,
+      outstandingBalance,
+      pendingTransactions: pendingCount.count,
+      completedTransactions: completedCount.count
+    };
+  }
+
+  // AI Assistant methods
+  async saveAIMessage(message: InsertAIMessage): Promise<AIMessage> {
+    const [result] = await db
+      .insert(aiMessages)
+      .values(message)
+      .returning();
+    
+    return result;
+  }
+
+  async getAIConversationHistory(conversationId: string): Promise<AIMessage[]> {
+    return await db
+      .select()
+      .from(aiMessages)
+      .where(eq(aiMessages.conversation_id, conversationId))
+      .orderBy(aiMessages.timestamp);
+  }
+}

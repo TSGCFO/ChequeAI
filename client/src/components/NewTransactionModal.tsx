@@ -193,8 +193,8 @@ export default function NewTransactionModal({ isOpen, onClose }: NewTransactionM
                       <SelectContent>
                         {isLoadingCustomers ? (
                           <SelectItem value="loading" disabled>Loading customers...</SelectItem>
-                        ) : customers && customers.length > 0 ? (
-                          customers.map((customer) => (
+                        ) : customers && Array.isArray(customers) && customers.length > 0 ? (
+                          customers.map((customer: any) => (
                             <SelectItem key={customer.customer_id} value={customer.customer_id.toString()}>
                               {customer.customer_name}
                             </SelectItem>
@@ -260,8 +260,8 @@ export default function NewTransactionModal({ isOpen, onClose }: NewTransactionM
                       <SelectContent>
                         {isLoadingVendors ? (
                           <SelectItem value="loading" disabled>Loading vendors...</SelectItem>
-                        ) : vendors && vendors.length > 0 ? (
-                          vendors.map((vendor) => (
+                        ) : vendors && Array.isArray(vendors) && vendors.length > 0 ? (
+                          vendors.map((vendor: any) => (
                             <SelectItem key={vendor.vendor_id} value={vendor.vendor_id}>
                               {vendor.vendor_name}
                             </SelectItem>

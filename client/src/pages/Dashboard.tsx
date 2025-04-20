@@ -10,7 +10,7 @@ import NewTransactionModal from "@/components/NewTransactionModal";
 import useTransactions from "@/hooks/useTransactions";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { BusinessSummary } from "../../shared/schema";
+import { BusinessSummary } from "@shared/schema";
 
 export default function Dashboard() {
   const [showDocModal, setShowDocModal] = useState(false);
