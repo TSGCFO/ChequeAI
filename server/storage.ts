@@ -43,6 +43,12 @@ export interface IStorage {
   // Business summary
   getBusinessSummary(): Promise<BusinessSummary>;
   
+  // Reports
+  getReportData(
+    reportName: string, 
+    filters?: { customerId?: number; vendorId?: string; startDate?: string; endDate?: string }
+  ): Promise<any[]>;
+  
   // AI Assistant methods
   saveAIMessage(message: InsertAIMessage): Promise<AIMessage>;
   getAIConversationHistory(conversationId: string): Promise<AIMessage[]>;
@@ -483,6 +489,203 @@ export class MemStorage implements IStorage {
     };
   }
 
+  // Reports methods
+  async getReportData(
+    reportName: string, 
+    filters?: { customerId?: number; vendorId?: string; startDate?: string; endDate?: string }
+  ): Promise<any[]> {
+    // This is a simplified implementation for memory storage
+    // In a real implementation, we would have proper SQL views
+    
+    const transactions = Array.from(this.transactions.values());
+    const customers = Array.from(this.customers.values());
+    const vendors = Array.from(this.vendors.values());
+    
+    // Apply filters
+    let filteredTransactions = [...transactions];
+    
+    if (filters?.customerId) {
+      filteredTransactions = filteredTransactions.filter(t => t.customer_id === filters.customerId);
+    }
+    
+    if (filters?.vendorId) {
+      filteredTransactions = filteredTransactions.filter(t => t.vendor_id === filters.vendorId);
+    }
+    
+    if (filters?.startDate) {
+      const startDate = new Date(filters.startDate);
+      filteredTransactions = filteredTransactions.filter(t => new Date(t.date) >= startDate);
+    }
+    
+    if (filters?.endDate) {
+      const endDate = new Date(filters.endDate);
+      filteredTransactions = filteredTransactions.filter(t => new Date(t.date) <= endDate);
+    }
+    
+    // Return data based on report name
+    switch (reportName) {
+      case "customer_balances":
+        return customers.map(customer => {
+          const customerTransactions = transactions.filter(t => t.customer_id === customer.customer_id);
+          const totalOwed = customerTransactions.reduce((sum, t) => sum + parseFloat(t.net_payable_to_customer as any), 0).toFixed(2);
+          const totalPaid = customerTransactions.reduce((sum, t) => sum + parseFloat(t.paid_to_customer as any), 0).toFixed(2);
+          const balance = (parseFloat(totalOwed) - parseFloat(totalPaid)).toFixed(2);
+          
+          return {
+            customer_id: customer.customer_id,
+            customer_name: customer.customer_name,
+            total_owed: totalOwed,
+            total_paid: totalPaid,
+            balance
+          };
+        });
+        
+      case "vendor_balances":
+        return vendors.map(vendor => {
+          const vendorTransactions = transactions.filter(t => t.vendor_id === vendor.vendor_id);
+          const totalReceivable = vendorTransactions.reduce((sum, t) => sum + parseFloat(t.amount_to_receive_from_vendor as any), 0).toFixed(2);
+          const totalReceived = vendorTransactions.reduce((sum, t) => sum + parseFloat(t.received_from_vendor as any), 0).toFixed(2);
+          const balance = (parseFloat(totalReceivable) - parseFloat(totalReceived)).toFixed(2);
+          
+          return {
+            vendor_id: vendor.vendor_id,
+            vendor_name: vendor.vendor_name,
+            total_receivable: totalReceivable,
+            total_received: totalReceived,
+            balance
+          };
+        });
+        
+      case "daily_profit_summary":
+        // Group transactions by date
+        const dailyProfits = new Map<string, number>();
+        filteredTransactions.forEach(t => {
+          const dateStr = new Date(t.date).toISOString().split('T')[0];
+          const profit = parseFloat(t.profit as any || "0");
+          dailyProfits.set(dateStr, (dailyProfits.get(dateStr) || 0) + profit);
+        });
+        
+        return Array.from(dailyProfits.entries()).map(([date, profit]) => ({
+          date,
+          profit: profit.toFixed(2)
+        }));
+        
+      case "weekly_profit_summary":
+        // Simple implementation - group by week number in year
+        const weeklyProfits = new Map<string, number>();
+        filteredTransactions.forEach(t => {
+          const date = new Date(t.date);
+          const weekNumber = this.getWeekNumber(date);
+          const year = date.getFullYear();
+          const weekKey = `${year}-W${weekNumber}`;
+          const profit = parseFloat(t.profit as any || "0");
+          weeklyProfits.set(weekKey, (weeklyProfits.get(weekKey) || 0) + profit);
+        });
+        
+        return Array.from(weeklyProfits.entries()).map(([weekKey, profit]) => ({
+          week: weekKey,
+          profit: profit.toFixed(2)
+        }));
+        
+      case "monthly_profit_summary":
+        // Group transactions by month
+        const monthlyProfits = new Map<string, number>();
+        filteredTransactions.forEach(t => {
+          const date = new Date(t.date);
+          const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+          const profit = parseFloat(t.profit as any || "0");
+          monthlyProfits.set(monthKey, (monthlyProfits.get(monthKey) || 0) + profit);
+        });
+        
+        return Array.from(monthlyProfits.entries()).map(([month, profit]) => ({
+          month,
+          profit: profit.toFixed(2)
+        }));
+        
+      case "profit_by_customer":
+        return customers.map(customer => {
+          const customerTransactions = transactions.filter(t => t.customer_id === customer.customer_id);
+          const totalProfit = customerTransactions.reduce((sum, t) => sum + parseFloat(t.profit as any || "0"), 0).toFixed(2);
+          const transactionCount = customerTransactions.length;
+          
+          return {
+            customer_id: customer.customer_id,
+            customer_name: customer.customer_name,
+            transaction_count: transactionCount,
+            total_profit: totalProfit
+          };
+        });
+        
+      case "profit_by_vendor":
+        return vendors.map(vendor => {
+          const vendorTransactions = transactions.filter(t => t.vendor_id === vendor.vendor_id);
+          const totalProfit = vendorTransactions.reduce((sum, t) => sum + parseFloat(t.profit as any || "0"), 0).toFixed(2);
+          const transactionCount = vendorTransactions.length;
+          
+          return {
+            vendor_id: vendor.vendor_id,
+            vendor_name: vendor.vendor_name,
+            transaction_count: transactionCount,
+            total_profit: totalProfit
+          };
+        });
+        
+      case "transaction_status_report":
+        return filteredTransactions.map(t => {
+          const customer = this.customers.get(t.customer_id);
+          const vendor = this.vendors.get(t.vendor_id);
+          
+          return {
+            transaction_id: t.transaction_id,
+            date: new Date(t.date).toISOString().split('T')[0],
+            cheque_number: t.cheque_number,
+            cheque_amount: t.cheque_amount,
+            customer_name: customer?.customer_name || 'Unknown',
+            vendor_name: vendor?.vendor_name || 'Unknown',
+            status: t.status,
+            customer_payment_status: parseFloat(t.paid_to_customer as any) >= parseFloat(t.net_payable_to_customer as any) ? 'Fully Paid' : 'Partially Paid',
+            vendor_payment_status: parseFloat(t.received_from_vendor as any) >= parseFloat(t.amount_to_receive_from_vendor as any) ? 'Fully Received' : 'Partially Received'
+          };
+        });
+        
+      case "outstanding_balances":
+        // Only transactions with outstanding balances
+        return filteredTransactions
+          .filter(t => {
+            const customerOutstanding = parseFloat(t.net_payable_to_customer as any) - parseFloat(t.paid_to_customer as any) > 0;
+            const vendorOutstanding = parseFloat(t.amount_to_receive_from_vendor as any) - parseFloat(t.received_from_vendor as any) > 0;
+            return customerOutstanding || vendorOutstanding;
+          })
+          .map(t => {
+            const customer = this.customers.get(t.customer_id);
+            const vendor = this.vendors.get(t.vendor_id);
+            const customerOutstanding = (parseFloat(t.net_payable_to_customer as any) - parseFloat(t.paid_to_customer as any)).toFixed(2);
+            const vendorOutstanding = (parseFloat(t.amount_to_receive_from_vendor as any) - parseFloat(t.received_from_vendor as any)).toFixed(2);
+            
+            return {
+              transaction_id: t.transaction_id,
+              date: new Date(t.date).toISOString().split('T')[0],
+              cheque_number: t.cheque_number,
+              customer_name: customer?.customer_name || 'Unknown',
+              customer_outstanding: customerOutstanding,
+              vendor_name: vendor?.vendor_name || 'Unknown',
+              vendor_outstanding: vendorOutstanding
+            };
+          });
+      
+      default:
+        // For other reports, return empty array
+        return [];
+    }
+  }
+  
+  // Helper function to get week number
+  private getWeekNumber(date: Date): number {
+    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+    const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
+    return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+  }
+  
   // AI Assistant methods
   async saveAIMessage(message: InsertAIMessage): Promise<AIMessage> {
     const newMessage: AIMessage = {

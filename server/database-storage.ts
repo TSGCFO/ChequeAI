@@ -248,6 +248,54 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  // Reports methods
+  async getReportData(
+    reportName: string, 
+    filters?: { customerId?: number; vendorId?: string; startDate?: string; endDate?: string }
+  ): Promise<any[]> {
+    try {
+      const { pool } = await import('./db');
+      
+      let query = `SELECT * FROM ${reportName}`;
+      const queryParams: any[] = [];
+      
+      // Apply filters if provided
+      if (filters) {
+        const whereConditions: string[] = [];
+        
+        if (filters.customerId) {
+          whereConditions.push(`customer_id = $${queryParams.length + 1}`);
+          queryParams.push(filters.customerId);
+        }
+        
+        if (filters.vendorId) {
+          whereConditions.push(`vendor_id = $${queryParams.length + 1}`);
+          queryParams.push(filters.vendorId);
+        }
+        
+        if (filters.startDate) {
+          whereConditions.push(`date >= $${queryParams.length + 1}`);
+          queryParams.push(filters.startDate);
+        }
+        
+        if (filters.endDate) {
+          whereConditions.push(`date <= $${queryParams.length + 1}`);
+          queryParams.push(filters.endDate);
+        }
+        
+        if (whereConditions.length > 0) {
+          query += ` WHERE ${whereConditions.join(' AND ')}`;
+        }
+      }
+      
+      const result = await pool.query(query, queryParams);
+      return result.rows;
+    } catch (error) {
+      console.error(`Error retrieving report data from ${reportName}:`, error);
+      return []; // Return empty array instead of throwing to prevent app crashes
+    }
+  }
+
   // AI Assistant methods
   async saveAIMessage(message: InsertAIMessage): Promise<AIMessage> {
     const [result] = await db

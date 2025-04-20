@@ -45,6 +45,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
+  
+  // Reports endpoints
+  app.get(`${apiRouter}/reports/customer-balances`, async (req, res) => {
+    try {
+      const results = await storage.getReportData("customer_balances");
+      res.json(results);
+    } catch (error) {
+      console.error("Error retrieving customer balances report:", error);
+      res.status(500).json({ error: "Failed to retrieve customer balances report" });
+    }
+  });
+
+  app.get(`${apiRouter}/reports/vendor-balances`, async (req, res) => {
+    try {
+      const results = await storage.getReportData("vendor_balances");
+      res.json(results);
+    } catch (error) {
+      console.error("Error retrieving vendor balances report:", error);
+      res.status(500).json({ error: "Failed to retrieve vendor balances report" });
+    }
+  });
+
+  app.get(`${apiRouter}/reports/profit-summary/daily`, async (req, res) => {
+    try {
+      const results = await storage.getReportData("daily_profit_summary");
+      res.json(results);
+    } catch (error) {
+      console.error("Error retrieving daily profit summary report:", error);
+      res.status(500).json({ error: "Failed to retrieve daily profit summary report" });
+    }
+  });
+
+  app.get(`${apiRouter}/reports/profit-summary/weekly`, async (req, res) => {
+    try {
+      const results = await storage.getReportData("weekly_profit_summary");
+      res.json(results);
+    } catch (error) {
+      console.error("Error retrieving weekly profit summary report:", error);
+      res.status(500).json({ error: "Failed to retrieve weekly profit summary report" });
+    }
+  });
+
+  app.get(`${apiRouter}/reports/profit-summary/monthly`, async (req, res) => {
+    try {
+      const results = await storage.getReportData("monthly_profit_summary");
+      res.json(results);
+    } catch (error) {
+      console.error("Error retrieving monthly profit summary report:", error);
+      res.status(500).json({ error: "Failed to retrieve monthly profit summary report" });
+    }
+  });
+
+  app.get(`${apiRouter}/reports/profit-by-customer`, async (req, res) => {
+    try {
+      const results = await storage.getReportData("profit_by_customer");
+      res.json(results);
+    } catch (error) {
+      console.error("Error retrieving profit by customer report:", error);
+      res.status(500).json({ error: "Failed to retrieve profit by customer report" });
+    }
+  });
+
+  app.get(`${apiRouter}/reports/profit-by-vendor`, async (req, res) => {
+    try {
+      const results = await storage.getReportData("profit_by_vendor");
+      res.json(results);
+    } catch (error) {
+      console.error("Error retrieving profit by vendor report:", error);
+      res.status(500).json({ error: "Failed to retrieve profit by vendor report" });
+    }
+  });
+
+  app.get(`${apiRouter}/reports/transaction-status`, async (req, res) => {
+    try {
+      const results = await storage.getReportData("transaction_status_report");
+      res.json(results);
+    } catch (error) {
+      console.error("Error retrieving transaction status report:", error);
+      res.status(500).json({ error: "Failed to retrieve transaction status report" });
+    }
+  });
+
+  app.get(`${apiRouter}/reports/outstanding-balances`, async (req, res) => {
+    try {
+      const results = await storage.getReportData("outstanding_balances");
+      res.json(results);
+    } catch (error) {
+      console.error("Error retrieving outstanding balances report:", error);
+      res.status(500).json({ error: "Failed to retrieve outstanding balances report" });
+    }
+  });
+
+  app.get(`${apiRouter}/reports/customer-detailed-transactions`, async (req, res) => {
+    try {
+      const customerId = req.query.customerId ? Number(req.query.customerId) : undefined;
+      const results = await storage.getReportData("customer_detailed_transactions", { customerId });
+      res.json(results);
+    } catch (error) {
+      console.error("Error retrieving customer detailed transactions report:", error);
+      res.status(500).json({ error: "Failed to retrieve customer detailed transactions report" });
+    }
+  });
+
+  app.get(`${apiRouter}/reports/vendor-detailed-transactions`, async (req, res) => {
+    try {
+      const vendorId = req.query.vendorId as string | undefined;
+      const results = await storage.getReportData("vendor_detailed_transactions", { vendorId });
+      res.json(results);
+    } catch (error) {
+      console.error("Error retrieving vendor detailed transactions report:", error);
+      res.status(500).json({ error: "Failed to retrieve vendor detailed transactions report" });
+    }
+  });
 
   // Get all transactions
   app.get(`${apiRouter}/transactions`, async (req, res) => {
