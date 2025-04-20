@@ -1,10 +1,320 @@
 import OpenAI from "openai";
 import { storage } from "../storage";
+import { InsertTransaction } from "@shared/schema";
 
 // Initialize OpenAI with the API key from environment variables
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY || ""
 });
+
+// Help message for the assistant
+const HELP_MESSAGE = `
+I'm your AI assistant for Cheque Ledger Pro. I can help with the following commands:
+
+Commands:
+- \`/new transaction\` - Create a new transaction (I'll ask for details)
+- \`/find transaction\` - Find transaction details (I'll ask for the ID)
+- \`/summary\` - Get a summary of business metrics
+- \`/help\` - Show this help message
+
+For general questions, just ask me directly about:
+- Transaction details
+- Customer information
+- Vendor information
+- Business reports and analytics
+
+How can I assist you today?
+`;
+
+// State tracking for command-based conversations
+type ConversationState = {
+  [conversationId: string]: {
+    currentCommand?: string;
+    pendingData?: {
+      customerId?: number;
+      chequeNumber?: string;
+      amount?: string;
+      vendorId?: string;
+      [key: string]: any;
+    };
+    step?: string;
+  };
+};
+
+const conversationStates: ConversationState = {};
+
+/**
+ * Handle the /new transaction command
+ * @param userMessage User's message
+ * @param conversationId Conversation ID
+ * @param state Current conversation state
+ * @returns Response message and updated state
+ */
+async function handleNewTransactionCommand(
+  userMessage: string, 
+  conversationId: string, 
+  state: ConversationState[string]
+): Promise<{ response: string; updatedState: ConversationState[string] }> {
+  // Initialize state if not exists
+  if (!state.step) {
+    return {
+      response: "Let's create a new transaction. Please provide the customer ID:",
+      updatedState: {
+        ...state,
+        currentCommand: "/new transaction",
+        pendingData: {},
+        step: "askCustomerId"
+      }
+    };
+  }
+
+  // Process based on current step
+  switch (state.step) {
+    case "askCustomerId":
+      const customerId = parseInt(userMessage.trim());
+      if (isNaN(customerId)) {
+        return {
+          response: "Customer ID must be a number. Please try again:",
+          updatedState: state
+        };
+      }
+
+      // Verify customer exists
+      try {
+        const customer = await storage.getCustomer(customerId);
+        if (!customer) {
+          return {
+            response: "Customer not found. Please provide a valid customer ID:",
+            updatedState: state
+          };
+        }
+
+        return {
+          response: `Customer: ${customer.customer_name}. Now, please provide the cheque number:`,
+          updatedState: {
+            ...state,
+            pendingData: { ...state.pendingData, customerId },
+            step: "askChequeNumber"
+          }
+        };
+      } catch (error) {
+        console.error("Error verifying customer:", error);
+        return {
+          response: "Error verifying customer. Please try again with a valid customer ID:",
+          updatedState: state
+        };
+      }
+
+    case "askChequeNumber":
+      const chequeNumber = userMessage.trim();
+      if (!chequeNumber) {
+        return {
+          response: "Cheque number is required. Please provide a valid cheque number:",
+          updatedState: state
+        };
+      }
+
+      return {
+        response: "Please enter the cheque amount (e.g., 1000.50):",
+        updatedState: {
+          ...state,
+          pendingData: { ...state.pendingData, chequeNumber },
+          step: "askAmount"
+        }
+      };
+
+    case "askAmount":
+      const amount = userMessage.trim().replace('$', '');
+      const amountNumber = parseFloat(amount);
+      
+      if (isNaN(amountNumber) || amountNumber <= 0) {
+        return {
+          response: "Please enter a valid positive number for the amount:",
+          updatedState: state
+        };
+      }
+
+      return {
+        response: "Finally, please provide the vendor ID:",
+        updatedState: {
+          ...state,
+          pendingData: { ...state.pendingData, amount: amountNumber.toString() },
+          step: "askVendorId"
+        }
+      };
+
+    case "askVendorId":
+      const vendorId = userMessage.trim();
+      if (!vendorId) {
+        return {
+          response: "Vendor ID is required. Please provide a valid vendor ID:",
+          updatedState: state
+        };
+      }
+
+      // Verify vendor exists
+      try {
+        const vendor = await storage.getVendor(vendorId);
+        if (!vendor) {
+          return {
+            response: "Vendor not found. Please provide a valid vendor ID:",
+            updatedState: state
+          };
+        }
+
+        // Create the transaction
+        try {
+          const newTransaction: InsertTransaction = {
+            customer_id: state.pendingData!.customerId!,
+            cheque_number: state.pendingData!.chequeNumber!,
+            cheque_amount: state.pendingData!.amount!,
+            vendor_id: vendorId,
+            date: new Date().toISOString(),
+            status: "Pending"
+          };
+
+          const transaction = await storage.createTransaction(newTransaction);
+
+          // Format response with transaction details
+          return {
+            response: `Transaction created successfully!
+
+\`\`\`json
+{
+  "transaction_id": ${transaction.transaction_id},
+  "chequeNumber": "${transaction.cheque_number}",
+  "amount": "${transaction.cheque_amount}",
+  "date": "${transaction.date ? new Date(transaction.date).toLocaleDateString() : 'N/A'}",
+  "status": "${transaction.status || 'Pending'}"
+}
+\`\`\`
+
+The transaction has been added to the database. You can view it in the transactions list.`,
+            updatedState: {
+              currentCommand: undefined,
+              pendingData: undefined,
+              step: undefined
+            }
+          };
+        } catch (error) {
+          console.error("Error creating transaction:", error);
+          return {
+            response: "Error creating the transaction. Please try again later.",
+            updatedState: {
+              currentCommand: undefined,
+              pendingData: undefined,
+              step: undefined
+            }
+          };
+        }
+      } catch (error) {
+        console.error("Error verifying vendor:", error);
+        return {
+          response: "Error verifying vendor. Please try again with a valid vendor ID:",
+          updatedState: state
+        };
+      }
+
+    default:
+      return {
+        response: "Something went wrong with the transaction creation process. Let's start over. Please provide the customer ID:",
+        updatedState: {
+          ...state,
+          step: "askCustomerId",
+          pendingData: {}
+        }
+      };
+  }
+}
+
+/**
+ * Handle command-based interactions
+ * @param userMessage User's message
+ * @param conversationId Conversation ID
+ * @returns Response message or null if not a command
+ */
+async function handleCommands(userMessage: string, conversationId: string): Promise<string | null> {
+  // Get or initialize conversation state
+  const state = conversationStates[conversationId] || {};
+  
+  // Check if we're in the middle of a command flow
+  if (state.currentCommand) {
+    let response: string;
+    let updatedState;
+
+    // Process based on current command
+    switch (state.currentCommand) {
+      case "/new transaction":
+        const result = await handleNewTransactionCommand(userMessage, conversationId, state);
+        response = result.response;
+        updatedState = result.updatedState;
+        break;
+        
+      // Add other command handlers here
+      
+      default:
+        response = "I'm not sure what we were doing. How can I help you?";
+        updatedState = {
+          currentCommand: undefined,
+          pendingData: undefined,
+          step: undefined
+        };
+    }
+
+    // Update conversation state
+    conversationStates[conversationId] = updatedState;
+    
+    // Save assistant message to conversation history
+    await storage.saveAIMessage({
+      user_id: 0,
+      content: response,
+      role: "assistant",
+      conversation_id: conversationId
+    });
+    
+    return response;
+  }
+
+  // Check for new commands
+  const trimmedMessage = userMessage.trim().toLowerCase();
+  
+  if (trimmedMessage === "/help") {
+    // Save assistant message to conversation history
+    await storage.saveAIMessage({
+      user_id: 0,
+      content: HELP_MESSAGE,
+      role: "assistant",
+      conversation_id: conversationId
+    });
+    
+    return HELP_MESSAGE;
+  }
+  
+  if (trimmedMessage === "/new transaction") {
+    conversationStates[conversationId] = {
+      currentCommand: "/new transaction",
+      pendingData: {},
+      step: "askCustomerId"
+    };
+    
+    const response = "Let's create a new transaction. Please provide the customer ID:";
+    
+    // Save assistant message to conversation history
+    await storage.saveAIMessage({
+      user_id: 0,
+      content: response,
+      role: "assistant",
+      conversation_id: conversationId
+    });
+    
+    return response;
+  }
+  
+  // Add more command handlers here
+  
+  // Not a command, return null to continue with normal AI response
+  return null;
+}
 
 /**
  * Generates an AI response based on user input and context
@@ -14,6 +324,12 @@ const openai = new OpenAI({
  */
 export async function generateAIResponse(userMessage: string, conversationId: string): Promise<string> {
   try {
+    // First check if this is a command
+    const commandResponse = await handleCommands(userMessage, conversationId);
+    if (commandResponse !== null) {
+      return commandResponse;
+    }
+    
     // Get conversation history for context
     const conversationHistory = await storage.getAIConversationHistory(conversationId);
     
@@ -22,17 +338,22 @@ export async function generateAIResponse(userMessage: string, conversationId: st
       {
         role: "system",
         content: `You are an AI assistant for a cheque cashing business ledger management system called 'Cheque Ledger Pro'. 
-                  You can help users with:
-                  1. Creating, finding, and analyzing transactions
-                  2. Generating reports on customer and vendor activity
-                  3. Calculating fees and profits
-                  4. Explaining business processes
                   
-                  You have access to transaction data, customers, and vendors. Be helpful, concise, and professional.
-                  If the user asks to perform an action like creating a transaction or processing a document, 
-                  guide them on how to use the appropriate interface feature.
+                  You understand the following COMMANDS:
+                  - /help - Display help information about available commands
+                  - /new transaction - Start the process to create a new transaction
+                  - /find transaction - Find transaction details
+                  - /summary - Get business summary
                   
-                  For numerical values, always format currency with a dollar sign and two decimal places.`
+                  When the user asks about creating transactions or other system actions, remind them to use these slash commands.
+                  
+                  If a user asks a question that you don't have enough information for, direct them to use one of the available commands.
+                  
+                  For numerical values, always format currency with a dollar sign and two decimal places.
+                  
+                  Never make up information and be explicit when you don't know something.
+                  
+                  When showing transactions or other data, use code blocks with proper formatting for readability.`
       }
     ];
     
@@ -84,7 +405,17 @@ export async function generateAIResponse(userMessage: string, conversationId: st
       max_tokens: 1000,
     });
     
-    return response.choices[0].message.content || "I'm sorry, I couldn't generate a response.";
+    const assistantResponse = response.choices[0].message.content || "I'm sorry, I couldn't generate a response.";
+    
+    // Save assistant message to conversation history
+    await storage.saveAIMessage({
+      user_id: 0,
+      content: assistantResponse,
+      role: "assistant",
+      conversation_id: conversationId
+    });
+    
+    return assistantResponse;
     
   } catch (error) {
     console.error("Error generating AI response:", error);

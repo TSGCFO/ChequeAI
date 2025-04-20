@@ -455,19 +455,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: message,
         role: 'user',
         conversation_id: conversationId || 'default',
-        user_id: userId
+        user_id: userId || 0
       });
 
-      // Generate AI response
-      const aiResponse = await generateAIResponse(message, conversationId);
-
-      // Save AI response
-      await storage.saveAIMessage({
-        content: aiResponse,
-        role: 'assistant',
-        conversation_id: conversationId || 'default',
-        user_id: userId
-      });
+      // Generate AI response - this function now handles saving the assistant's response
+      const aiResponse = await generateAIResponse(message, conversationId || 'default');
 
       res.json({ response: aiResponse });
     } catch (error) {
