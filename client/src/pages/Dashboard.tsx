@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Calendar, Search, Filter, Plus } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import TransactionCard from "@/components/TransactionCard";
@@ -48,15 +49,15 @@ export default function Dashboard() {
         <div className="border-b border-gray-200 bg-white px-4 py-2">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex space-x-4">
-              <button className="border-b-2 border-primary px-1 py-2 text-sm font-medium text-primary">
+              <Link to="/" className="border-b-2 border-primary px-1 py-2 text-sm font-medium text-primary">
                 Transactions
-              </button>
-              <button className="px-1 py-2 text-sm font-medium text-gray-500">
+              </Link>
+              <Link to="/customers" className="px-1 py-2 text-sm font-medium text-gray-500 hover:border-b-2 hover:border-primary hover:text-primary">
                 Customers
-              </button>
-              <button className="px-1 py-2 text-sm font-medium text-gray-500">
+              </Link>
+              <Link to="/vendors" className="px-1 py-2 text-sm font-medium text-gray-500 hover:border-b-2 hover:border-primary hover:text-primary">
                 Vendors
-              </button>
+              </Link>
             </div>
             <div className="flex items-center space-x-2">
               <div className="relative">
