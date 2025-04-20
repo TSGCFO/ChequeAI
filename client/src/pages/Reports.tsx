@@ -316,7 +316,7 @@ export default function Reports() {
                           {profitByCustomer.slice(0, 5).map((item: any) => (
                             <TableRow key={item.customer_id}>
                               <TableCell>{item.customer_name}</TableCell>
-                              <TableCell>${parseFloat(item.total_profit).toFixed(2)}</TableCell>
+                              <TableCell>${parseFloat(item.total_profit || "0").toFixed(2)}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -338,7 +338,7 @@ export default function Reports() {
                           {profitByVendor.slice(0, 5).map((item: any) => (
                             <TableRow key={item.vendor_id}>
                               <TableCell>{item.vendor_name}</TableCell>
-                              <TableCell>${parseFloat(item.total_profit).toFixed(2)}</TableCell>
+                              <TableCell>${parseFloat(item.total_profit || "0").toFixed(2)}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -420,7 +420,7 @@ export default function Reports() {
                           <TableRow key={item.customer_id}>
                             <TableCell className="font-medium">{item.customer_name}</TableCell>
                             <TableCell>{item.transaction_count}</TableCell>
-                            <TableCell>${parseFloat(item.total_profit).toFixed(2)}</TableCell>
+                            <TableCell>${parseFloat(item.total_profit || "0").toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -501,7 +501,7 @@ export default function Reports() {
                           <TableRow key={item.vendor_id}>
                             <TableCell className="font-medium">{item.vendor_name}</TableCell>
                             <TableCell>{item.transaction_count}</TableCell>
-                            <TableCell>${parseFloat(item.total_profit).toFixed(2)}</TableCell>
+                            <TableCell>${parseFloat(item.total_profit || "0").toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
