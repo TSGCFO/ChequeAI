@@ -22,7 +22,7 @@ export default function Sidebar() {
             return (
               <li key={item.name}>
                 <Link 
-                  href={item.path}
+                  to={item.path}
                   className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${
                     isActive
                       ? "bg-gray-100 text-primary"
