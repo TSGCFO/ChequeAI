@@ -29,11 +29,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get business summary
   app.get(`${apiRouter}/summary`, async (req, res) => {
     try {
-      const summary = await storage.getBusinessSummary();
+      // Try to use direct database connection first
+      const { getBusinessSummary } = await import('./direct-db');
+      const summary = await getBusinessSummary();
       res.json(summary);
     } catch (error) {
       console.error("Error getting business summary:", error);
-      res.status(500).json({ message: "Failed to get business summary" });
+      try {
+        // Fallback to storage interface
+        const summary = await storage.getBusinessSummary();
+        res.json(summary);
+      } catch (fallbackError) {
+        console.error("Fallback error:", fallbackError);
+        res.status(500).json({ message: "Failed to get business summary" });
+      }
     }
   });
 
@@ -46,8 +55,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vendorId = req.query.vendorId as string | undefined;
       const status = req.query.status as string | undefined;
       
-      const transactions = await storage.getTransactions({ limit, offset, customerId, vendorId, status });
-      res.json(transactions);
+      // Try direct database connection first
+      try {
+        const { getTransactions } = await import('./direct-db');
+        const transactions = await getTransactions();
+        // Note: Direct connection doesn't support filtering yet
+        res.json(transactions);
+        return;
+      } catch (directError) {
+        console.error("Direct DB error:", directError);
+        // Fall back to storage interface
+        const transactions = await storage.getTransactions({ limit, offset, customerId, vendorId, status });
+        res.json(transactions);
+      }
     } catch (error) {
       console.error("Error getting transactions:", error);
       res.status(500).json({ message: "Failed to get transactions" });

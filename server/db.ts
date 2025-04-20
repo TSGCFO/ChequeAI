@@ -1,9 +1,8 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import pg from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
 
-neonConfig.webSocketConstructor = ws;
+const { Pool } = pg;
 
 // Priority: Use Supabase URL if available, otherwise fall back to Replit's DATABASE_URL
 const databaseUrl = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
@@ -14,11 +13,21 @@ if (!databaseUrl) {
   );
 }
 
-console.log("Connecting to database...");
+console.log("Connecting to database using node-postgres...");
 export const pool = new Pool({ 
   connectionString: databaseUrl,
   ssl: {
     rejectUnauthorized: false // This is only for development, not recommended for production
   }
 });
+
+// Test database connection
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error('Database connection error:', err.message);
+  } else {
+    console.log('Database connection successful! Current time:', res.rows[0].now);
+  }
+});
+
 export const db = drizzle(pool, { schema });
