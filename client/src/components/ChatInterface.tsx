@@ -200,7 +200,9 @@ export default function ChatInterface({ onClose }: ChatInterfaceProps) {
     return (
       <>
         {formattedContent.split('\n').map((line, index) => (
-          <p key={index} className={line.trim() ? 'my-1' : 'h-2'}>{line}</p>
+          line.trim() ? 
+            <p key={index} className="my-1">{line}</p> : 
+            <div key={index} className="h-2"></div>
         ))}
       </>
     );

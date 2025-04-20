@@ -170,7 +170,7 @@ async function handleNewTransactionCommand(
             cheque_amount: state.pendingData!.amount!,
             vendor_id: vendorId,
             date: new Date().toISOString(),
-            status: "Pending"
+            status: "pending"
           };
 
           const transaction = await storage.createTransaction(newTransaction);
@@ -185,7 +185,7 @@ async function handleNewTransactionCommand(
   "chequeNumber": "${transaction.cheque_number}",
   "chequeAmount": "${transaction.cheque_amount}",
   "date": "${transaction.date ? new Date(transaction.date.toString()).toLocaleDateString() : 'N/A'}",
-  "status": "${transaction.status || 'Pending'}"
+  "status": "${transaction.status || 'pending'}"
 }
 \`\`\`
 
