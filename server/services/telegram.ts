@@ -1,5 +1,5 @@
 import TelegramBot from "node-telegram-bot-api";
-import { generateAIResponse, processVoiceMessage } from "./openai";
+import { generateAIResponse, processVoiceMessage, processChequeDocument } from "./openai";
 
 // Telegram bot token from environment variables
 const telegramToken = process.env.TELEGRAM_BOT_TOKEN || "";
@@ -107,9 +107,82 @@ function setupBot() {
           console.error("Error processing voice message:", voiceError);
           response = "Sorry, I had trouble processing your voice message. Could you please try sending it as text instead?";
         }
+      }
+      // Handle photo messages (cheque images)
+      else if (msg.photo && msg.photo.length > 0) {
+        // Notify user that we're processing their image
+        await bot.sendMessage(chatId, "Processing your cheque image...");
+        
+        try {
+          // Get the largest photo (last in the array)
+          const photo = msg.photo[msg.photo.length - 1];
+          const fileInfo = await bot.getFile(photo.file_id);
+          
+          // Get the file path from Telegram servers
+          const fileUrl = `https://api.telegram.org/file/bot${telegramToken}/${fileInfo.file_path}`;
+          
+          // Download the image
+          const imageResponse = await fetch(fileUrl);
+          if (!imageResponse.ok) {
+            throw new Error(`Failed to download image: ${imageResponse.statusText}`);
+          }
+          
+          // Convert to buffer
+          const imageBuffer = await imageResponse.arrayBuffer();
+          
+          // Process the image (detect and extract cheque information)
+          response = await processChequeDocument(
+            Buffer.from(imageBuffer), 
+            'image/jpeg', // Telegram usually provides JPEGs for photos
+            conversationId
+          );
+        } catch (imageError) {
+          console.error("Error processing image:", imageError);
+          response = "Sorry, I had trouble processing your image. Please ensure it contains a clear picture of a cheque and try again.";
+        }
+      }
+      // Handle document messages (could be PDF scans of cheques)
+      else if (msg.document) {
+        // Only process documents with appropriate mime types
+        const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/tiff'];
+        const mimeType = msg.document.mime_type || '';
+        
+        if (!allowedMimeTypes.includes(mimeType)) {
+          response = "I can only process PDF, JPEG, PNG, or TIFF documents containing cheque images. Please upload a supported file format.";
+        } else {
+          // Notify user that we're processing their document
+          await bot.sendMessage(chatId, "Processing your document...");
+          
+          try {
+            // Get the file info
+            const fileInfo = await bot.getFile(msg.document.file_id);
+            
+            // Get the file path from Telegram servers
+            const fileUrl = `https://api.telegram.org/file/bot${telegramToken}/${fileInfo.file_path}`;
+            
+            // Download the document
+            const docResponse = await fetch(fileUrl);
+            if (!docResponse.ok) {
+              throw new Error(`Failed to download document: ${docResponse.statusText}`);
+            }
+            
+            // Convert to buffer
+            const docBuffer = await docResponse.arrayBuffer();
+            
+            // Process the document (detect and extract cheque information)
+            response = await processChequeDocument(
+              Buffer.from(docBuffer),
+              mimeType,
+              conversationId
+            );
+          } catch (docError) {
+            console.error("Error processing document:", docError);
+            response = "Sorry, I had trouble processing your document. Please ensure it contains a clear scan of a cheque and try again.";
+          }
+        }
       } else {
-        // For other types of messages (photos, documents, etc.)
-        response = "I can only understand text and voice messages. Please send your query as text or voice.";
+        // For other types of messages
+        response = "I can only understand text, voice messages, and cheque images/scans. Please send your query in one of these formats.";
       }
       
       // Send response

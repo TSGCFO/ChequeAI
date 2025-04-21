@@ -32,6 +32,11 @@ How can I assist you today?
 `;
 
 // State tracking for command-based conversations
+type CommandResult = {
+  response: string;
+  updatedState: ConversationState[string];
+};
+
 type ConversationState = {
   [conversationId: string]: {
     currentCommand?: string;
@@ -40,6 +45,9 @@ type ConversationState = {
       chequeNumber?: string;
       amount?: string;
       vendorId?: string;
+      extractedCheques?: any[];
+      currentChequeIndex?: number;
+      newTransaction?: InsertTransaction;
       [key: string]: any;
     };
     step?: string;
@@ -561,6 +569,280 @@ The changes have been saved to the database.`,
           ...state,
           step: "askTransactionId",
           pendingData: {}
+        }
+      };
+  }
+}
+
+/**
+ * Handle the cheque processing workflow after image analysis
+ * @param userMessage User's message
+ * @param conversationId Conversation ID
+ * @param state Current conversation state
+ * @returns Response message and updated state
+ */
+async function handleChequeProcessingCommand(
+  userMessage: string,
+  conversationId: string,
+  state: ConversationState[string]
+): Promise<{ response: string; updatedState: ConversationState[string] }> {
+  // Check for cancel command
+  if (userMessage.trim().toLowerCase() === "/cancel" || userMessage.trim().toLowerCase() === "cancel") {
+    return {
+      response: "Cheque processing cancelled. How can I help you?",
+      updatedState: {
+        currentCommand: undefined,
+        pendingData: undefined,
+        step: undefined
+      }
+    };
+  }
+
+  // Extract state information
+  const pendingData = state.pendingData || {};
+  const extractedCheques = state.pendingData?.extractedCheques || [];
+  const currentChequeIndex = state.pendingData?.currentChequeIndex || 0;
+  const currentCheque = extractedCheques[currentChequeIndex];
+
+  // Process based on current step
+  switch (state.step) {
+    case "confirm_extraction":
+      // Check if user wants to proceed with creating a transaction
+      const confirmResponse = userMessage.trim().toLowerCase();
+      if (confirmResponse === "yes" || confirmResponse === "y" || confirmResponse.includes("yes") || confirmResponse.includes("correct")) {
+        // Move to next step to get customer ID
+        return {
+          response: "Great! Let's create a new transaction with this cheque. Please provide the customer ID:",
+          updatedState: {
+            ...state,
+            currentCommand: "process_cheque",
+            step: "askCustomerId"
+          }
+        };
+      } else if (confirmResponse === "no" || confirmResponse === "n" || confirmResponse.includes("no") || confirmResponse.includes("wrong")) {
+        // User indicates the extraction is incorrect
+        return {
+          response: "I'm sorry the extraction wasn't accurate. Please provide the correct cheque number and amount manually, or upload a clearer image.",
+          updatedState: {
+            currentCommand: undefined,
+            pendingData: undefined,
+            step: undefined
+          }
+        };
+      } else {
+        // Check if user is providing corrections
+        const chequeNumberMatch = userMessage.match(/cheque\s+number\s*(?:is|:)?\s*(\d+)/i);
+        const amountMatch = userMessage.match(/amount\s*(?:is|:)?\s*\$?(\d+(?:\.\d+)?)/i);
+        
+        if (chequeNumberMatch || amountMatch) {
+          // Update the data based on corrections
+          if (chequeNumberMatch && chequeNumberMatch[1]) {
+            pendingData.chequeNumber = chequeNumberMatch[1];
+          }
+          
+          if (amountMatch && amountMatch[1]) {
+            pendingData.amount = amountMatch[1];
+          }
+          
+          return {
+            response: `I've updated the information. Cheque #${pendingData.chequeNumber} for $${pendingData.amount}. Is this correct now? Would you like to create a new transaction with this cheque?`,
+            updatedState: {
+              ...state,
+              pendingData,
+              step: "confirm_extraction"
+            }
+          };
+        }
+        
+        // Unclear response, ask again
+        return {
+          response: "I'm not sure if you want to proceed. Please say 'yes' if you want to create a transaction with this cheque, or 'no' if you don't. If you need to correct some information, please specify which details need to be fixed.",
+          updatedState: state
+        };
+      }
+      
+    case "askCustomerId":
+      const customerId = parseInt(userMessage.trim());
+      if (isNaN(customerId)) {
+        return {
+          response: "Customer ID must be a number. Please try again:",
+          updatedState: state
+        };
+      }
+
+      // Verify customer exists
+      try {
+        const customer = await storage.getCustomer(customerId);
+        if (!customer) {
+          return {
+            response: "Customer not found. Please provide a valid customer ID:",
+            updatedState: state
+          };
+        }
+
+        return {
+          response: `Customer: ${customer.customer_name}. Now, please provide the vendor ID:`,
+          updatedState: {
+            ...state,
+            pendingData: { ...pendingData, customerId },
+            step: "askVendorId"
+          }
+        };
+      } catch (error) {
+        console.error("Error verifying customer:", error);
+        return {
+          response: "Error verifying customer. Please try again:",
+          updatedState: state
+        };
+      }
+      
+    case "askVendorId":
+      const vendorId = userMessage.trim();
+      
+      // Verify vendor exists
+      try {
+        const vendor = await storage.getVendor(vendorId);
+        if (!vendor) {
+          return {
+            response: "Vendor not found. Please provide a valid vendor ID:",
+            updatedState: state
+          };
+        }
+
+        // Prepare transaction data
+        const customerId = pendingData.customerId;
+        const chequeNumber = pendingData.chequeNumber;
+        const amount = pendingData.amount;
+        
+        // Check for required fields
+        if (!customerId || !chequeNumber || !amount) {
+          return {
+            response: "Missing required information (customer ID, cheque number, or amount). Please try again.",
+            updatedState: {
+              currentCommand: undefined,
+              pendingData: undefined,
+              step: undefined
+            }
+          };
+        }
+        
+        const newTransaction: InsertTransaction = {
+          customer_id: customerId,
+          cheque_number: chequeNumber,
+          cheque_amount: amount.toString(),
+          vendor_id: vendorId,
+          date: new Date().toISOString().split('T')[0]
+        };
+
+        // Show transaction summary and ask for confirmation
+        return {
+          response: `Please confirm the following transaction:
+          
+Customer ID: ${newTransaction.customer_id}
+Cheque Number: ${newTransaction.cheque_number}
+Amount: $${newTransaction.cheque_amount}
+Vendor ID: ${newTransaction.vendor_id}
+Date: ${newTransaction.date}
+Status: pending
+
+Type "confirm" to create this transaction or "cancel" to abort.`,
+          updatedState: {
+            ...state,
+            pendingData: { ...pendingData, vendorId, newTransaction },
+            step: "confirmTransaction"
+          }
+        };
+      } catch (error) {
+        console.error("Error verifying vendor:", error);
+        return {
+          response: "Error verifying vendor. Please try again:",
+          updatedState: state
+        };
+      }
+      
+    case "confirmTransaction":
+      const confirm = userMessage.trim().toLowerCase();
+      
+      if (confirm === "confirm") {
+        try {
+          // Create the transaction
+          if (!pendingData.newTransaction) {
+            throw new Error("Missing transaction data");
+          }
+          const transaction = await storage.createTransaction(pendingData.newTransaction);
+          
+          // Check if there are more cheques to process
+          if (extractedCheques.length > currentChequeIndex + 1) {
+            // Move to next cheque
+            const nextChequeIndex = currentChequeIndex + 1;
+            const nextCheque = extractedCheques[nextChequeIndex];
+            
+            return {
+              response: `Transaction created successfully! Transaction ID: ${transaction.transaction_id}
+
+Let's process the next cheque:
+
+Cheque Number: ${nextCheque.chequeNumber || 'Not detected'}
+Amount: ${nextCheque.amount || 'Not detected'}
+Date: ${nextCheque.date || 'Not detected'}
+Payee: ${nextCheque.payeeName || 'Not detected'}
+Bank: ${nextCheque.bankName || 'Not detected'}
+
+Is this information correct? Would you like to create a new transaction with this cheque?`,
+              updatedState: {
+                currentCommand: "process_cheque",
+                step: "confirm_extraction",
+                pendingData: {
+                  extractedCheques,
+                  currentChequeIndex: nextChequeIndex,
+                  chequeNumber: nextCheque.chequeNumber,
+                  amount: nextCheque.amount
+                }
+              }
+            };
+          }
+          
+          // No more cheques to process
+          return {
+            response: `Transaction created successfully! Transaction ID: ${transaction.transaction_id}
+
+All cheques have been processed. Is there anything else you'd like to do?`,
+            updatedState: {
+              currentCommand: undefined,
+              pendingData: undefined,
+              step: undefined
+            }
+          };
+        } catch (error) {
+          console.error("Error creating transaction:", error);
+          return {
+            response: "There was an error creating the transaction. Please try again.",
+            updatedState: state
+          };
+        }
+      } else if (confirm === "cancel") {
+        return {
+          response: "Transaction cancelled. How can I help you?",
+          updatedState: {
+            currentCommand: undefined,
+            pendingData: undefined,
+            step: undefined
+          }
+        };
+      } else {
+        return {
+          response: `Please type "confirm" to create the transaction or "cancel" to abort.`,
+          updatedState: state
+        };
+      }
+      
+    default:
+      return {
+        response: "I'm not sure what we were doing. How can I help you?",
+        updatedState: {
+          currentCommand: undefined,
+          pendingData: undefined,
+          step: undefined
         }
       };
   }
