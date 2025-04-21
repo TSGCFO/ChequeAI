@@ -115,7 +115,6 @@ function useOutstandingBalances() {
           throw new Error(`Error fetching outstanding balances: ${response.statusText}`);
         }
         const data = await response.json();
-        console.log("Outstanding balances data:", JSON.stringify(data));
         return data || [];
       } catch (error) {
         console.error("Error fetching outstanding balances:", error);
@@ -269,23 +268,17 @@ export default function Reports() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Cheque #</TableHead>
-                          <TableHead>Customer</TableHead>
-                          <TableHead>Vendor</TableHead>
-                          <TableHead>Outstanding</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Entity</TableHead>
+                          <TableHead>Outstanding Amount</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {outstandingBalances.map((item: any, index: number) => (
-                          <TableRow key={`outstanding-balance-${index}-${item.cheque_number || item.transaction_id || ''}`}>
-                            <TableCell>{item.cheque_number}</TableCell>
-                            <TableCell>{item.customer_name}</TableCell>
-                            <TableCell>{item.vendor_name}</TableCell>
-                            <TableCell>
-                              {parseFloat(item.customer_outstanding || "0") > 0 ? 
-                                `$${parseFloat(item.customer_outstanding || "0").toFixed(2)} (to customer)` : 
-                                `$${parseFloat(item.vendor_outstanding || "0").toFixed(2)} (from vendor)`}
-                            </TableCell>
+                          <TableRow key={`outstanding-balance-${index}`}>
+                            <TableCell>{item.balance_type}</TableCell>
+                            <TableCell>{item.name}</TableCell>
+                            <TableCell>${parseFloat(item.outstanding_amount || "0").toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -312,8 +305,6 @@ export default function Reports() {
                     <p>Loading...</p>
                   ) : profitByCustomer && profitByCustomer.length > 0 ? (
                     <>
-                      {/* Debug info - Will be removed */}
-                      {/* Debug info */}
                       <div className="max-h-32 overflow-auto">
                         <Table>
                           <TableBody>
@@ -356,8 +347,6 @@ export default function Reports() {
                     <p>Loading...</p>
                   ) : profitByVendor && profitByVendor.length > 0 ? (
                     <>
-                      {/* Debug info - Will be removed */}
-                      {/* Debug info */}
                       <div className="max-h-32 overflow-auto">
                         <Table>
                           <TableBody>
