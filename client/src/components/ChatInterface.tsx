@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import useAIAssistant from "@/hooks/useAIAssistant";
 import { apiRequest } from "@/lib/queryClient";
+import DocumentProcessingModal from "./DocumentProcessingModal";
 
 interface ChatInterfaceProps {
   onClose?: () => void;
@@ -27,6 +28,7 @@ interface Transaction {
 
 export default function ChatInterface({ onClose }: ChatInterfaceProps) {
   const [activeTab, setActiveTab] = useState("assistant");
+  const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -38,7 +40,16 @@ export default function ChatInterface({ onClose }: ChatInterfaceProps) {
       timestamp: new Date(),
     },
   ]);
-  const [conversationId] = useState(`session-${Date.now()}`);
+  // Check if a conversationId exists in localStorage (set during document processing)
+  const [conversationId] = useState(() => {
+    const storedId = window.localStorage.getItem('currentConversationId');
+    if (storedId) {
+      // Clear it immediately after retrieving to avoid reusing it on refreshes
+      window.localStorage.removeItem('currentConversationId');
+      return storedId;
+    }
+    return `session-${Date.now()}`;
+  });
   const { sendMessage } = useAIAssistant(conversationId);
   const { toast } = useToast();
 
@@ -49,6 +60,63 @@ export default function ChatInterface({ onClose }: ChatInterfaceProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+  
+  // Load conversation history when component mounts
+  useEffect(() => {
+    const fetchConversationHistory = async () => {
+      try {
+        const response = await fetch(`/api/ai-assistant/history/${conversationId}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch conversation history');
+        }
+        
+        const historyMessages = await response.json();
+        
+        // Only update if we have history messages and it's not the initial load
+        if (historyMessages && historyMessages.length > 0) {
+          // Convert the messages from the API format to our local format
+          const formattedMessages: Message[] = historyMessages.map((msg: any, index: number) => ({
+            id: index + 1,
+            role: msg.role as "user" | "assistant" | "system",
+            content: msg.content,
+            timestamp: new Date(msg.created_at || Date.now())
+          }));
+          
+          // Only if there are messages and we haven't initialized yet
+          if (formattedMessages.length > 0 && messages.length <= 1) {
+            // Keep the welcome message and add the history
+            setMessages(prevMessages => {
+              // If we have only the welcome message, keep it and add history
+              if (prevMessages.length === 1 && prevMessages[0].role === 'assistant') {
+                return [...prevMessages, ...formattedMessages];
+              }
+              // Otherwise just use the history
+              return formattedMessages;
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching conversation history:', error);
+      }
+    };
+
+    // Only fetch if we have a conversation ID that's not a new session
+    if (conversationId && !conversationId.startsWith('session-')) {
+      fetchConversationHistory();
+    } else if (conversationId && window.localStorage.getItem('lastProcessedDocument') === 'true') {
+      // If we just processed a document, add a system message to indicate that
+      window.localStorage.removeItem('lastProcessedDocument');
+      setMessages(prevMessages => [
+        ...prevMessages,
+        {
+          id: prevMessages.length + 1,
+          role: 'system',
+          content: 'A document has been processed. You can continue the conversation about the cheque details.',
+          timestamp: new Date()
+        }
+      ]);
+    }
+  }, [conversationId]);
 
   const handleSendMessage = async () => {
     if (!message.trim()) return;
@@ -208,8 +276,27 @@ export default function ChatInterface({ onClose }: ChatInterfaceProps) {
     );
   };
 
+  // Effect to handle tab changes
+  useEffect(() => {
+    if (activeTab === "document") {
+      setIsDocumentModalOpen(true);
+    }
+  }, [activeTab]);
+
+  // Handler when document modal is closed
+  const handleDocumentModalClose = () => {
+    setIsDocumentModalOpen(false);
+    setActiveTab("assistant");
+  };
+
   return (
     <>
+      {/* Document Processing Modal */}
+      <DocumentProcessingModal 
+        isOpen={isDocumentModalOpen} 
+        onClose={handleDocumentModalClose} 
+      />
+      
       {/* Tabs for AI Assistant */}
       <div className="border-b border-gray-200 px-4 py-2">
         <div className="flex justify-between items-center">

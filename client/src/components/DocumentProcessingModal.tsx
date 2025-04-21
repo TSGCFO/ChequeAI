@@ -136,8 +136,9 @@ export default function DocumentProcessingModal({ isOpen, onClose }: DocumentPro
         });
         
         // The AI system now has the conversation data and will handle the rest in the chat interface
-        // We need to pass the conversationId to the ChatInterface component somehow
+        // Set two localStorage items to pass data to the ChatInterface component
         window.localStorage.setItem('currentConversationId', result.conversationId);
+        window.localStorage.setItem('lastProcessedDocument', 'true');
       } else {
         toast({
           title: "Document processed successfully",
