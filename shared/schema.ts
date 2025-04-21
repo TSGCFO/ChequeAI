@@ -141,6 +141,7 @@ export type InsertAIMessage = z.infer<typeof insertAIMessageSchema>;
 export type TransactionWithDetails = ChequeTransaction & {
   customer: Pick<Customer, 'customer_name'>;
   vendor: Pick<Vendor, 'vendor_name'>;
+  status?: string; // Add status field for UI display
 };
 
 // Create a type for business summary
