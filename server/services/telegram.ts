@@ -7,13 +7,32 @@ const telegramToken = process.env.TELEGRAM_BOT_TOKEN || "";
 // Initialize the bot
 let bot: TelegramBot | null = null;
 
-// Try to initialize the bot if token is available
-if (telegramToken) {
+// Check if we're in a deployed environment
+// This checks both Replit's deployment flag and if we're running on a production server
+const isDeployedEnvironment = process.env.REPLIT_DEPLOYMENT === 'true' || 
+                             process.env.NODE_ENV === 'production';
+
+// Check if we should run the Telegram bot
+// Only run in development or if explicitly configured for deployment
+const shouldRunTelegramBot = telegramToken && 
+                            (process.env.ENABLE_TELEGRAM_BOT_IN_DEPLOYMENT === 'true' || 
+                             !isDeployedEnvironment);
+
+// Try to initialize the bot if token is available and we should run it
+if (shouldRunTelegramBot) {
   try {
+    console.log("Initializing Telegram bot");
+    // Just use the simple polling option for now
     bot = new TelegramBot(telegramToken, { polling: true });
     setupBot();
   } catch (error) {
     console.error("Error initializing Telegram bot:", error);
+  }
+} else {
+  if (isDeployedEnvironment) {
+    console.log("Telegram bot disabled in deployment environment. Set ENABLE_TELEGRAM_BOT_IN_DEPLOYMENT=true to enable.");
+  } else if (!telegramToken) {
+    console.log("Telegram bot token not found. Bot functionality disabled.");
   }
 }
 
