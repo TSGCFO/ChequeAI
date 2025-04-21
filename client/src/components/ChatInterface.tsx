@@ -385,7 +385,13 @@ export default function ChatInterface({ onClose }: ChatInterfaceProps) {
       {/* Chat Input */}
       <div className="border-t border-gray-200 p-4">
         <div className="flex space-x-2">
-          <Button variant="outline" size="icon" className="flex-shrink-0">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="flex-shrink-0"
+            onClick={() => setIsDocumentModalOpen(true)}
+            title="Upload cheque or document"
+          >
             <Paperclip className="h-4 w-4" />
           </Button>
           <div className="relative flex-1">
@@ -410,7 +416,7 @@ export default function ChatInterface({ onClose }: ChatInterfaceProps) {
         <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
           <div className="flex items-center">
             <Info className="mr-1 h-3 w-3" />
-            <span>Connected to GPT-4</span>
+            <span>Connected to GPT-4o</span>
           </div>
           <div>
             <Button variant="link" size="sm" className="h-auto p-0 text-primary">

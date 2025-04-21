@@ -1482,9 +1482,11 @@ export async function processChequeDocument(
       }
       
       // Store the extracted cheque information in the conversation state
-      const state = conversationStates[conversationId] || {};
-      state.extractedCheques = extractionResult.cheques;
-      state.currentChequeIndex = 0;
+      const state = conversationStates[conversationId] || { pendingData: {} };
+      if (!state.pendingData) state.pendingData = {};
+      
+      state.pendingData.extractedCheques = extractionResult.cheques;
+      state.pendingData.currentChequeIndex = 0;
       state.currentCommand = "process_cheque";
       state.step = "confirm_extraction";
       conversationStates[conversationId] = state;
@@ -1497,6 +1499,7 @@ export async function processChequeDocument(
         
         // Save initial information to state
         state.pendingData = {
+          ...state.pendingData,
           chequeNumber: cheque.chequeNumber,
           amount: cheque.amount
         };
@@ -1518,6 +1521,7 @@ Would you like to create a new transaction with this cheque?`;
         
         // Save initial information to state for the first cheque
         state.pendingData = {
+          ...state.pendingData,
           chequeNumber: firstCheque.chequeNumber,
           amount: firstCheque.amount
         };
