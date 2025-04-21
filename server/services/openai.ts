@@ -357,7 +357,7 @@ Remember, you can only modify the date, cheque number, amount, and vendor ID.`,
 
       // Ask for the new value based on selected field
       let promptMessage: string;
-      switch (fieldToModify) {
+      switch (selectedField) {
         case "date":
           promptMessage = "Please enter the new date (YYYY-MM-DD):";
           break;
@@ -378,7 +378,7 @@ Remember, you can only modify the date, cheque number, amount, and vendor ID.`,
         response: promptMessage,
         updatedState: {
           ...state,
-          pendingData: { ...state.pendingData, fieldToModify },
+          pendingData: { ...state.pendingData, fieldToModify: selectedField },
           step: "askNewValue"
         }
       };
@@ -423,7 +423,17 @@ Remember, you can only modify the date, cheque number, amount, and vendor ID.`,
 
       // Prepare update data (only include allowed fields)
       const updateData: Partial<InsertTransaction> = {};
-      updateData[fieldToModify] = newValue;
+      
+      // Only assign to allowed fields to avoid type errors and ensure we follow constraints
+      if (fieldToModify === "date") {
+        updateData.date = newValue;
+      } else if (fieldToModify === "cheque_number") {
+        updateData.cheque_number = newValue;
+      } else if (fieldToModify === "cheque_amount") {
+        updateData.cheque_amount = newValue;
+      } else if (fieldToModify === "vendor_id") {
+        updateData.vendor_id = newValue;
+      }
 
       // Show confirmation with clear before/after information
       let oldValueDisplay: string;
@@ -435,8 +445,14 @@ Remember, you can only modify the date, cheque number, amount, and vendor ID.`,
       } else if (fieldToModify === "date") {
         oldValueDisplay = originalTransaction.date ? new Date(originalTransaction.date.toString()).toLocaleDateString() : 'Not set';
         newValueDisplay = newValue;
+      } else if (fieldToModify === "cheque_number") {
+        oldValueDisplay = originalTransaction.cheque_number;
+        newValueDisplay = newValue;
+      } else if (fieldToModify === "vendor_id") {
+        oldValueDisplay = originalTransaction.vendor_id;
+        newValueDisplay = newValue;
       } else {
-        oldValueDisplay = originalTransaction[fieldToModify] || 'Not set';
+        oldValueDisplay = 'Unknown';
         newValueDisplay = newValue;
       }
 
@@ -793,6 +809,26 @@ async function handleCommands(userMessage: string, conversationId: string): Prom
     return response;
   }
   
+  if (trimmedMessage === "/modify transaction") {
+    conversationStates[conversationId] = {
+      currentCommand: "/modify transaction",
+      pendingData: {},
+      step: "askTransactionId"
+    };
+    
+    const response = "Let's modify a transaction. Please provide the transaction ID (or type /cancel to cancel):";
+    
+    // Save assistant message to conversation history
+    await storage.saveAIMessage({
+      user_id: 0,
+      content: response,
+      role: "assistant",
+      conversation_id: conversationId
+    });
+    
+    return response;
+  }
+  
   // Add more command handlers here
   
   // Not a command, return null to continue with normal AI response
@@ -826,6 +862,7 @@ export async function generateAIResponse(userMessage: string, conversationId: st
                   - /help - Display help information about available commands
                   - /new transaction - Start the process to create a new transaction
                   - /deposit - Start the process to create a new customer deposit
+                  - /modify transaction - Modify an existing transaction (only date, cheque number, amount or vendor)
                   - /find transaction - Find transaction details
                   - /summary - Get business summary
                   
