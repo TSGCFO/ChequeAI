@@ -115,6 +115,7 @@ function useOutstandingBalances() {
           throw new Error(`Error fetching outstanding balances: ${response.statusText}`);
         }
         const data = await response.json();
+        console.log("Outstanding balances data:", JSON.stringify(data));
         return data || [];
       } catch (error) {
         console.error("Error fetching outstanding balances:", error);
@@ -310,21 +311,40 @@ export default function Reports() {
                   {profitByCustomerLoading ? (
                     <p>Loading...</p>
                   ) : profitByCustomer && profitByCustomer.length > 0 ? (
-                    <div className="max-h-32 overflow-auto">
-                      <Table>
-                        <TableBody>
-                          {profitByCustomer
-                            .sort((a, b) => parseFloat(b.total_profit || "0") - parseFloat(a.total_profit || "0"))
-                            .slice(0, 5)
-                            .map((item: any) => (
-                              <TableRow key={item.customer_id}>
-                                <TableCell>{item.customer_name}</TableCell>
-                                <TableCell>${parseFloat(item.total_profit || "0").toFixed(2)}</TableCell>
-                              </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                    <>
+                      {/* Debug info - Will be removed */}
+                      {/* Debug info */}
+                      <div className="max-h-32 overflow-auto">
+                        <Table>
+                          <TableBody>
+                            {profitByCustomer
+                              .sort((a, b) => {
+                                // Use the appropriate profit field based on what's available
+                                const getProfitValue = (item: any) => 
+                                  parseFloat(item.total_profit || 
+                                    item.profit || 
+                                    item.total_realized_profit ||
+                                    item.unrealized_profit || 
+                                    "0");
+                                return getProfitValue(b) - getProfitValue(a);
+                              })
+                              .slice(0, 5)
+                              .map((item: any) => (
+                                <TableRow key={item.customer_id}>
+                                  <TableCell>{item.customer_name}</TableCell>
+                                  <TableCell>${parseFloat(
+                                    item.total_profit || 
+                                    item.profit || 
+                                    item.total_realized_profit || 
+                                    item.unrealized_profit || 
+                                    "0"
+                                  ).toFixed(2)}</TableCell>
+                                </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </>
                   ) : (
                     <p>No customer profit data available</p>
                   )}
@@ -335,21 +355,40 @@ export default function Reports() {
                   {profitByVendorLoading ? (
                     <p>Loading...</p>
                   ) : profitByVendor && profitByVendor.length > 0 ? (
-                    <div className="max-h-32 overflow-auto">
-                      <Table>
-                        <TableBody>
-                          {profitByVendor
-                            .sort((a, b) => parseFloat(b.total_profit || "0") - parseFloat(a.total_profit || "0"))
-                            .slice(0, 5)
-                            .map((item: any) => (
-                              <TableRow key={item.vendor_id}>
-                                <TableCell>{item.vendor_name}</TableCell>
-                                <TableCell>${parseFloat(item.total_profit || "0").toFixed(2)}</TableCell>
-                              </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                    <>
+                      {/* Debug info - Will be removed */}
+                      {/* Debug info */}
+                      <div className="max-h-32 overflow-auto">
+                        <Table>
+                          <TableBody>
+                            {profitByVendor
+                              .sort((a, b) => {
+                                // Use the appropriate profit field based on what's available
+                                const getProfitValue = (item: any) => 
+                                  parseFloat(item.total_profit || 
+                                    item.profit || 
+                                    item.total_realized_profit ||
+                                    item.unrealized_profit || 
+                                    "0");
+                                return getProfitValue(b) - getProfitValue(a);
+                              })
+                              .slice(0, 5)
+                              .map((item: any) => (
+                                <TableRow key={item.vendor_id}>
+                                  <TableCell>{item.vendor_name}</TableCell>
+                                  <TableCell>${parseFloat(
+                                    item.total_profit || 
+                                    item.profit || 
+                                    item.total_realized_profit || 
+                                    item.unrealized_profit || 
+                                    "0"
+                                  ).toFixed(2)}</TableCell>
+                                </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </>
                   ) : (
                     <p>No vendor profit data available</p>
                   )}
@@ -426,7 +465,13 @@ export default function Reports() {
                           <TableRow key={item.customer_id}>
                             <TableCell className="font-medium">{item.customer_name}</TableCell>
                             <TableCell>{item.transaction_count}</TableCell>
-                            <TableCell>${parseFloat(item.total_profit || "0").toFixed(2)}</TableCell>
+                            <TableCell>${parseFloat(
+                              item.total_profit || 
+                              item.profit || 
+                              item.total_realized_profit || 
+                              item.unrealized_profit || 
+                              "0"
+                            ).toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -507,7 +552,13 @@ export default function Reports() {
                           <TableRow key={item.vendor_id}>
                             <TableCell className="font-medium">{item.vendor_name}</TableCell>
                             <TableCell>{item.transaction_count}</TableCell>
-                            <TableCell>${parseFloat(item.total_profit || "0").toFixed(2)}</TableCell>
+                            <TableCell>${parseFloat(
+                              item.total_profit || 
+                              item.profit || 
+                              item.total_realized_profit || 
+                              item.unrealized_profit || 
+                              "0"
+                            ).toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
