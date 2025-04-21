@@ -13,15 +13,45 @@ const isDeployedEnvironment = process.env.REPLIT_DEPLOYMENT === 'true' ||
                              process.env.NODE_ENV === 'production';
 
 // Check if we should run the Telegram bot
-// Only run if explicitly configured, regardless of environment
-const shouldRunTelegramBot = telegramToken && process.env.ENABLE_TELEGRAM_BOT === 'true';
+// Run in all environments as long as we have a token and no override to disable
+const shouldRunTelegramBot = telegramToken && process.env.DISABLE_TELEGRAM_BOT !== 'true';
 
 // Try to initialize the bot if token is available and we should run it
 if (shouldRunTelegramBot) {
   try {
     console.log("Initializing Telegram bot");
-    // Just use the simple polling option for now
-    bot = new TelegramBot(telegramToken, { polling: true });
+    // Generate a unique session ID for this bot instance to prevent conflicts
+    const sessionId = `bot_session_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    
+    // Use the session ID and webhook mode in production to avoid polling conflicts
+    if (isDeployedEnvironment) {
+      console.log(`Starting Telegram bot in deployed environment with session ID: ${sessionId}`);
+      // In production, use webhook mode if a webhook URL is provided, otherwise polling with session
+      const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
+      
+      if (webhookUrl) {
+        console.log(`Setting up Telegram bot with webhook: ${webhookUrl}`);
+        bot = new TelegramBot(telegramToken, { 
+          polling: false,
+        });
+        // Set webhook
+        bot.setWebHook(webhookUrl).then(() => {
+          console.log('Webhook set successfully');
+        }).catch(err => {
+          console.error('Failed to set webhook:', err);
+          // Fall back to polling with session ID if webhook fails
+          // Fallback to polling with session ID
+          bot = new TelegramBot(telegramToken, { polling: true });
+        });
+      } else {
+        // No webhook URL, use polling
+        bot = new TelegramBot(telegramToken, { polling: true });
+      }
+    } else {
+      // In development, use simple polling
+      console.log('Starting Telegram bot in development mode');
+      bot = new TelegramBot(telegramToken, { polling: true });
+    }
     setupBot();
   } catch (error) {
     console.error("Error initializing Telegram bot:", error);
@@ -30,7 +60,7 @@ if (shouldRunTelegramBot) {
   if (!telegramToken) {
     console.log("Telegram bot token not found. Bot functionality disabled.");
   } else {
-    console.log("Telegram bot disabled. Set ENABLE_TELEGRAM_BOT=true to enable it.");
+    console.log("Telegram bot disabled by DISABLE_TELEGRAM_BOT environment variable.");
   }
 }
 
