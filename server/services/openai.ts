@@ -462,17 +462,19 @@ Remember, you can only modify the date, cheque number, amount, and vendor ID.`,
       } else if (fieldToModify === "vendor_id") {
         // Verify vendor exists
         try {
-          const vendor = await storage.getVendor(newValue);
+          const vendor = await findVendorByNameOrId(newValue);
           if (!vendor) {
             return {
-              response: "Vendor not found. Please provide a valid vendor ID:",
+              response: "Vendor not found. Please provide a valid vendor name or ID:",
               updatedState: state
             };
           }
+          // Store the actual ID
+          newValue = vendor.vendor_id;
         } catch (error) {
           console.error("Error verifying vendor:", error);
           return {
-            response: "Error verifying vendor. Please try again with a valid vendor ID:",
+            response: "Error verifying vendor. Please try again with a valid vendor name or ID:",
             updatedState: state
           };
         }
@@ -658,7 +660,7 @@ async function handleChequeProcessingCommand(
       if (confirmResponse === "yes" || confirmResponse === "y" || confirmResponse.includes("yes") || confirmResponse.includes("correct")) {
         // Move to next step to get customer ID
         return {
-          response: "Great! Let's create a new transaction with this cheque. Please provide the customer ID:",
+          response: "Great! Let's create a new transaction with this cheque. Please provide the customer name or ID:",
           updatedState: {
             ...state,
             currentCommand: "process_cheque",
@@ -708,52 +710,61 @@ async function handleChequeProcessingCommand(
       }
       
     case "askCustomerId":
-      const customerId = parseInt(userMessage.trim());
-      if (isNaN(customerId)) {
-        return {
-          response: "Customer ID must be a number. Please try again:",
-          updatedState: state
-        };
-      }
-
-      // Verify customer exists
+      // Try to find customer by name or ID
       try {
-        const customer = await storage.getCustomer(customerId);
+        const customerInput = userMessage.trim();
+        if (!customerInput) {
+          return {
+            response: "Please provide a customer name or ID:",
+            updatedState: state
+          };
+        }
+        
+        const customer = await findCustomerByNameOrId(customerInput);
         if (!customer) {
           return {
-            response: "Customer not found. Please provide a valid customer ID:",
+            response: "Customer not found. Please provide a valid customer name or ID:",
             updatedState: state
           };
         }
 
         return {
-          response: `Customer: ${customer.customer_name}. Now, please provide the vendor ID:`,
+          response: `Customer: ${customer.customer_name}. Now, please provide the vendor name or ID:`,
           updatedState: {
             ...state,
-            pendingData: { ...pendingData, customerId },
+            pendingData: { ...pendingData, customerId: customer.customer_id },
             step: "askVendorId"
           }
         };
       } catch (error) {
-        console.error("Error verifying customer:", error);
+        console.error("Error finding customer:", error);
         return {
-          response: "Error verifying customer. Please try again:",
+          response: "Error finding customer. Please try again with a valid customer name or ID:",
           updatedState: state
         };
       }
       
     case "askVendorId":
-      const vendorId = userMessage.trim();
+      const vendorInput = userMessage.trim();
+      if (!vendorInput) {
+        return {
+          response: "Vendor name or ID is required. Please provide a valid vendor name or ID:",
+          updatedState: state
+        };
+      }
       
       // Verify vendor exists
       try {
-        const vendor = await storage.getVendor(vendorId);
+        const vendor = await findVendorByNameOrId(vendorInput);
         if (!vendor) {
           return {
-            response: "Vendor not found. Please provide a valid vendor ID:",
+            response: "Vendor not found. Please provide a valid vendor name or ID:",
             updatedState: state
           };
         }
+        
+        // Store the vendor ID for transaction creation
+        const vendorId = vendor.vendor_id;
 
         // Prepare transaction data
         const customerId = pendingData.customerId;
@@ -801,7 +812,7 @@ Type "confirm" to create this transaction or "cancel" to abort.`,
       } catch (error) {
         console.error("Error verifying vendor:", error);
         return {
-          response: "Error verifying vendor. Please try again:",
+          response: "Error verifying vendor. Please try again with a valid vendor name or ID:",
           updatedState: state
         };
       }
@@ -1361,7 +1372,7 @@ After confirming, I can help you create a new transaction with this cheque.`;
       step: "askTransactionId"
     };
     
-    const response = "Let's modify a transaction. Please provide the transaction ID (or type /cancel to cancel):";
+    const response = "Let's modify a transaction. Please provide the transaction ID or cheque number (or type /cancel to cancel):";
     
     // Save assistant message to conversation history
     await storage.saveAIMessage({
