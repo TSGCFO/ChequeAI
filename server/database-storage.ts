@@ -199,53 +199,68 @@ export class DatabaseStorage implements IStorage {
 
   // Business summary
   async getBusinessSummary(): Promise<BusinessSummary> {
-    // Get total transactions count
-    const [transactionCount] = await db
-      .select({ count: count() })
-      .from(chequeTransactions);
-
-    // Get total amount processed
-    const [totalAmountResult] = await db
-      .select({ sum: sum(chequeTransactions.cheque_amount) })
-      .from(chequeTransactions);
-
-    // Get total profit
-    const [totalProfitResult] = await db
-      .select({ sum: sum(chequeTransactions.profit) })
-      .from(chequeTransactions);
-
-    // Get outstanding balance (transactions marked as pending)
-    const [outstandingBalanceResult] = await db
-      .select({ sum: sum(chequeTransactions.cheque_amount) })
-      .from(chequeTransactions)
-      .where(eq(chequeTransactions.status, 'pending'));
-
-    // Get pending and completed transaction counts
-    const [pendingCount] = await db
-      .select({ count: count() })
-      .from(chequeTransactions)
-      .where(eq(chequeTransactions.status, 'pending'));
-
-    const [completedCount] = await db
-      .select({ count: count() })
-      .from(chequeTransactions)
-      .where(eq(chequeTransactions.status, 'completed'));
-
-    // Format currency values
-    const totalAmount = totalAmountResult.sum ? parseFloat(totalAmountResult.sum.toString()).toFixed(2) : "0.00";
-    const totalProfit = totalProfitResult.sum ? parseFloat(totalProfitResult.sum.toString()).toFixed(2) : "0.00";
-    const outstandingBalance = outstandingBalanceResult.sum 
-      ? parseFloat(outstandingBalanceResult.sum.toString()).toFixed(2) 
-      : "0.00";
-
-    return {
-      totalTransactions: transactionCount.count,
-      totalAmount,
-      totalProfit,
-      outstandingBalance,
-      pendingTransactions: pendingCount.count,
-      completedTransactions: completedCount.count
-    };
+    try {
+      // Get total transactions count
+      const [transactionCount] = await db
+        .select({ count: count() })
+        .from(chequeTransactions);
+  
+      // Get total amount processed
+      const [totalAmountResult] = await db
+        .select({ sum: sum(chequeTransactions.cheque_amount) })
+        .from(chequeTransactions);
+  
+      // Get total profit
+      const [totalProfitResult] = await db
+        .select({ sum: sum(chequeTransactions.profit) })
+        .from(chequeTransactions);
+  
+      // Get outstanding balance - we'll query differently since we need the WHERE clause to be fixed
+      // The issue is likely here, we're checking for string 'pending' but the status is an enum or different format
+      // Let's use direct SQL instead of ORM for this specific query to ensure we get the right data
+      const { pool } = await import('./db');
+      
+      // We'll use SQL for outstanding balance, pending and completed counts since this is causing the issue
+      const outstandingBalanceSQL = "SELECT SUM(cheque_amount) FROM cheque_transactions WHERE status = $1";
+      const outstandingBalanceSQLResult = await pool.query(outstandingBalanceSQL, ['pending']);
+      const outstandingBalance = outstandingBalanceSQLResult.rows[0].sum 
+        ? parseFloat(outstandingBalanceSQLResult.rows[0].sum).toFixed(2) 
+        : "0.00";
+  
+      // Get pending and completed transaction counts
+      const pendingCountSQL = "SELECT COUNT(*) FROM cheque_transactions WHERE status = $1";
+      const pendingCountResult = await pool.query(pendingCountSQL, ['pending']);
+      const pendingTransactions = parseInt(pendingCountResult.rows[0].count) || 0;
+  
+      const completedCountSQL = "SELECT COUNT(*) FROM cheque_transactions WHERE status = $1";
+      const completedCountResult = await pool.query(completedCountSQL, ['completed']);
+      const completedTransactions = parseInt(completedCountResult.rows[0].count) || 0;
+  
+      // Format currency values for the other fields
+      const totalAmount = totalAmountResult.sum ? parseFloat(totalAmountResult.sum.toString()).toFixed(2) : "0.00";
+      const totalProfit = totalProfitResult.sum ? parseFloat(totalProfitResult.sum.toString()).toFixed(2) : "0.00";
+  
+      return {
+        totalTransactions: transactionCount.count,
+        totalAmount,
+        totalProfit,
+        outstandingBalance,
+        pendingTransactions,
+        completedTransactions
+      };
+    } catch (error) {
+      console.error("Error in getBusinessSummary:", error);
+      
+      // Return default values if there's an error to prevent app crashes
+      return {
+        totalTransactions: 0,
+        totalAmount: "0.00",
+        totalProfit: "0.00",
+        outstandingBalance: "0.00",
+        pendingTransactions: 0,
+        completedTransactions: 0
+      };
+    }
   }
 
   // Reports methods

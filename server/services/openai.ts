@@ -1806,22 +1806,27 @@ export async function generateAIResponse(userMessage: string, conversationId: st
     // Check if the message appears to be a query for transaction data
     const isDataQuery = /transactions|customer|vendor|summary|report|total|profit|balance/i.test(userMessage);
     
+    // Check if this is specifically asking for all transactions
+    const isAllTransactionsQuery = /all\s+transactions|show\s+(\w+\s+)?transactions|list\s+(\w+\s+)?transactions|recent\s+transactions/i.test(userMessage);
+    
     if (isDataQuery) {
       // Fetch relevant data to enhance the response
       try {
         const businessSummary = await storage.getBusinessSummary();
-        const recentTransactions = await storage.getTransactions({ limit: 5 });
+        // Get more transactions if the user is specifically asking for them
+        const limit = isAllTransactionsQuery ? 20 : 5;
+        const recentTransactions = await storage.getTransactions({ limit: limit });
         
         // Add data context to system message
         messages.unshift({
           role: "system",
           content: `Here is some recent data to help with your response:
                     Business Summary: ${JSON.stringify(businessSummary)}
-                    Recent Transactions: ${JSON.stringify(recentTransactions)}
+                    ${isAllTransactionsQuery ? 'All' : 'Recent'} Transactions: ${JSON.stringify(recentTransactions)}
                     
                     When showing transactions in your response, format them in a clear, readable way.
-                    If the user is asking about specific transactions that aren't in this data,
-                    let them know you only have access to recent transactions.`
+                    The database has a total of ${businessSummary.totalTransactions} transactions.
+                    If the user asks about transactions beyond the ones provided, let them know you've shown what's available.`
         });
       } catch (error) {
         console.error("Error fetching data for AI context:", error);
