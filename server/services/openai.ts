@@ -23,6 +23,8 @@ You can use either slash commands or natural language:
 - \`/modify transaction\` or "modify cheque number 00010572" or "change the amount of cheque 12345"
 - \`/summary\` or "show me a business summary" 
 - \`/help\` - Show this help message
+- \`/test\` - Enter test mode (commands will be processed but no changes will be saved to the database)
+- \`/exit-test\` - Exit test mode
 
 For general questions, just ask me directly about:
 - Transaction details
@@ -53,6 +55,7 @@ type ConversationState = {
       [key: string]: any;
     };
     step?: string;
+    testMode?: boolean;
   };
 };
 
@@ -1350,14 +1353,80 @@ After confirming, I can help you create a new transaction with this cheque.`;
     return HELP_MESSAGE;
   }
   
+  // Test mode command
+  if (trimmedMessage === "/test") {
+    // Set test mode flag for this conversation
+    if (!conversationStates[conversationId]) {
+      conversationStates[conversationId] = {};
+    }
+    conversationStates[conversationId].testMode = true;
+    
+    const testModeMessage = `
+🧪 Test mode activated 🧪
+
+You are now in test mode. All commands and interactions will function normally, but:
+- No transactions will be saved to the database
+- No records will be modified
+- No deposits will be processed
+
+This mode is designed for testing features without affecting real data.
+Use /exit-test to return to normal mode.
+`;
+    
+    // Save assistant message to conversation history
+    await storage.saveAIMessage({
+      user_id: 0,
+      content: testModeMessage,
+      role: "assistant",
+      conversation_id: conversationId
+    });
+    
+    return testModeMessage;
+  }
+  
+  // Exit test mode command
+  if (trimmedMessage === "/exit-test") {
+    // Turn off test mode flag for this conversation
+    if (conversationStates[conversationId] && conversationStates[conversationId].testMode) {
+      conversationStates[conversationId].testMode = false;
+      
+      const exitTestModeMessage = `
+✅ Test mode deactivated
+
+You have exited test mode. All commands will now perform real actions on the database.
+`;
+      
+      // Save assistant message to conversation history
+      await storage.saveAIMessage({
+        user_id: 0,
+        content: exitTestModeMessage,
+        role: "assistant",
+        conversation_id: conversationId
+      });
+      
+      return exitTestModeMessage;
+    }
+    
+    return "You are not currently in test mode.";
+  }
+  
   if (trimmedMessage === "/new transaction") {
+    // Preserve test mode flag if it exists
+    const testMode = conversationStates[conversationId]?.testMode;
+    
     conversationStates[conversationId] = {
       currentCommand: "/new transaction",
       pendingData: {},
-      step: "askCustomerId"
+      step: "askCustomerId",
+      testMode // Preserve test mode flag
     };
     
-    const response = "Let's create a new transaction. Please provide the customer name or ID (or type /cancel to cancel):";
+    let response = "Let's create a new transaction. Please provide the customer name or ID (or type /cancel to cancel):";
+    
+    // Add note if in test mode
+    if (testMode) {
+      response = "🧪 TEST MODE: " + response + "\n(No actual database changes will be made)";
+    }
     
     // Save assistant message to conversation history
     await storage.saveAIMessage({
@@ -1371,13 +1440,22 @@ After confirming, I can help you create a new transaction with this cheque.`;
   }
   
   if (trimmedMessage === "/deposit") {
+    // Preserve test mode flag if it exists
+    const testMode = conversationStates[conversationId]?.testMode;
+    
     conversationStates[conversationId] = {
       currentCommand: "/deposit",
       pendingData: {},
-      step: "askCustomerId"
+      step: "askCustomerId",
+      testMode // Preserve test mode flag
     };
     
-    const response = "Let's create a new customer deposit. Please provide the customer name or ID (or type /cancel to cancel):";
+    let response = "Let's create a new customer deposit. Please provide the customer name or ID (or type /cancel to cancel):";
+    
+    // Add note if in test mode
+    if (testMode) {
+      response = "🧪 TEST MODE: " + response + "\n(No actual database changes will be made)";
+    }
     
     // Save assistant message to conversation history
     await storage.saveAIMessage({
@@ -1391,13 +1469,22 @@ After confirming, I can help you create a new transaction with this cheque.`;
   }
   
   if (trimmedMessage === "/modify transaction") {
+    // Preserve test mode flag if it exists
+    const testMode = conversationStates[conversationId]?.testMode;
+    
     conversationStates[conversationId] = {
       currentCommand: "/modify transaction",
       pendingData: {},
-      step: "askTransactionId"
+      step: "askTransactionId",
+      testMode // Preserve test mode flag
     };
     
-    const response = "Let's modify a transaction. Please provide the transaction ID or cheque number (or type /cancel to cancel):";
+    let response = "Let's modify a transaction. Please provide the transaction ID or cheque number (or type /cancel to cancel):";
+    
+    // Add note if in test mode
+    if (testMode) {
+      response = "🧪 TEST MODE: " + response + "\n(No actual database changes will be made)";
+    }
     
     // Save assistant message to conversation history
     await storage.saveAIMessage({
@@ -1501,13 +1588,22 @@ Remember, you can only modify the date, cheque number, amount, and vendor ID.`;
   if (/new\s+(?:transaction|cheque|check)/i.test(trimmedMessage) || 
       /create\s+(?:a\s+)?(?:transaction|cheque|check)/i.test(trimmedMessage)) {
     
+    // Preserve test mode flag if it exists
+    const testMode = conversationStates[conversationId]?.testMode;
+    
     conversationStates[conversationId] = {
       currentCommand: "/new transaction",
       pendingData: {},
-      step: "askCustomerId"
+      step: "askCustomerId",
+      testMode // Preserve test mode flag
     };
     
-    const response = "Let's create a new transaction. Please provide the customer name or ID (or type /cancel to cancel):";
+    let response = "Let's create a new transaction. Please provide the customer name or ID (or type /cancel to cancel):";
+    
+    // Add note if in test mode
+    if (testMode) {
+      response = "🧪 TEST MODE: " + response + "\n(No actual database changes will be made)";
+    }
     
     // Save assistant message to conversation history
     await storage.saveAIMessage({
