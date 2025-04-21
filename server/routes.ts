@@ -7,7 +7,7 @@ import OpenAI from "openai";
 import multer from "multer";
 import { processDocument } from "./services/documentProcessor";
 import { sendTelegramMessage } from "./services/telegram";
-import { generateAIResponse } from "./services/openai";
+import { generateAIResponse, processChequeDocument } from "./services/openai";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -432,7 +432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Document processing
+  // Document processing with Tesseract
   app.post(`${apiRouter}/process-document`, upload.single('document'), async (req, res) => {
     try {
       if (!req.file) {
@@ -451,6 +451,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error processing document:", error);
       res.status(500).json({ message: "Failed to process document" });
+    }
+  });
+  
+  // AI-powered document processing using OpenAI vision model
+  app.post(`${apiRouter}/process-cheque`, upload.single('document'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No document uploaded" });
+      }
+      
+      // Create a unique conversation ID for web interface
+      const conversationId = `session-${Date.now()}`;
+      
+      // Extract file details
+      const fileBuffer = req.file.buffer;
+      const fileType = req.file.mimetype;
+      
+      // Process the document using the OpenAI-based cheque processing function
+      const result = await processChequeDocument(fileBuffer, fileType, conversationId);
+      
+      // Return the conversationId to the client so it can fetch the AI assistant responses
+      res.json({ 
+        success: true, 
+        message: result,
+        conversationId
+      });
+    } catch (error) {
+      console.error("Error processing cheque document:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: "Cheque document processing failed" 
+      });
     }
   });
 

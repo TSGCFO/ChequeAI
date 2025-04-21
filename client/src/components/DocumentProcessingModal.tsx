@@ -104,32 +104,52 @@ export default function DocumentProcessingModal({ isOpen, onClose }: DocumentPro
       const formData = new FormData();
       formData.append("document", file);
       
-      // Add extraction options
-      Object.entries(extractOptions).forEach(([key, value]) => {
-        formData.append(key, value.toString());
-      });
+      // Determine which endpoint to use based on the file type
+      const isAIChequeProcessingEnabled = true; // Set to true to use AI processing 
+      const endpoint = isAIChequeProcessingEnabled 
+        ? "/api/process-cheque"  // AI-powered processing
+        : "/api/process-document"; // Traditional OCR processing
       
-      const response = await fetch("/api/process-document", {
+      // For traditional OCR, add extraction options
+      if (!isAIChequeProcessingEnabled) {
+        Object.entries(extractOptions).forEach(([key, value]) => {
+          formData.append(key, value.toString());
+        });
+      }
+      
+      const response = await fetch(endpoint, {
         method: "POST",
         body: formData,
       });
       
       if (!response.ok) {
-        throw new Error("Failed to process document");
+        throw new Error(`Failed to process document: ${response.statusText}`);
       }
       
       const result = await response.json();
       
-      toast({
-        title: "Document processed successfully",
-        description: "The document was processed and information was extracted.",
-      });
+      // Display appropriate message based on the endpoint used
+      if (isAIChequeProcessingEnabled) {
+        toast({
+          title: "Cheque processed with AI",
+          description: "The AI assistant is now ready to help you complete the transaction.",
+        });
+        
+        // The AI system now has the conversation data and will handle the rest in the chat interface
+        // We need to pass the conversationId to the ChatInterface component somehow
+        window.localStorage.setItem('currentConversationId', result.conversationId);
+      } else {
+        toast({
+          title: "Document processed successfully",
+          description: "The document was processed and information was extracted.",
+        });
+        
+        // Traditional processing would return the extracted data directly
+        console.log("Extracted data:", result);
+      }
       
       // Close the modal
       onClose();
-      
-      // Additional logic to handle the extracted information
-      // For example, pre-fill a new transaction form
     } catch (error) {
       console.error("Error processing document:", error);
       toast({
