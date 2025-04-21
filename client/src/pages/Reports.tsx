@@ -326,6 +326,7 @@ export default function Reports() {
                                   <TableCell>${parseFloat(
                                     item.total_profit || 
                                     item.profit || 
+                                    item.total_potential_profit ||
                                     item.total_realized_profit || 
                                     item.unrealized_profit || 
                                     "0"
