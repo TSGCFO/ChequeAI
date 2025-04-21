@@ -1131,6 +1131,151 @@ export async function processVoiceMessage(audioBuffer: Buffer, conversationId: s
 }
 
 /**
+ * Process a cheque image or PDF and handle the transaction flow
+ * @param fileBuffer The file buffer of the image or PDF
+ * @param fileType The MIME type of the file ('image/jpeg', 'image/png', 'application/pdf', etc.)
+ * @param conversationId The conversation ID for context
+ * @returns AI-generated response about the cheque(s) found
+ */
+export async function processChequeDocument(
+  fileBuffer: Buffer, 
+  fileType: string, 
+  conversationId: string
+): Promise<string> {
+  try {
+    // Save a copy of the file for processing
+    const fileExtension = fileType.split('/')[1] || 'bin';
+    const tempFilePath = path.join(os.tmpdir(), `cheque-${Date.now()}.${fileExtension}`);
+    fs.writeFileSync(tempFilePath, fileBuffer);
+    
+    try {
+      // Convert buffer to base64
+      const base64Data = fileBuffer.toString('base64');
+      
+      // Process the image to extract cheque information
+      const extractionResult = await processImage(base64Data);
+      
+      // Save the image message to conversation history
+      await storage.saveAIMessage({
+        user_id: 0,
+        content: "[User uploaded an image of cheque(s)]",
+        role: "user",
+        conversation_id: conversationId
+      });
+      
+      // Check if the image contains cheques
+      if (!extractionResult.isCheque) {
+        const response = "I don't see any bank cheques in the image. Please confirm if you're trying to upload a cheque image. If so, please upload a clearer image of the cheque(s).";
+        
+        // Save the assistant's response to conversation history
+        await storage.saveAIMessage({
+          user_id: 0,
+          content: response,
+          role: "assistant",
+          conversation_id: conversationId
+        });
+        
+        return response;
+      }
+      
+      // Check confidence level
+      if (extractionResult.confidence < 0.5) {
+        const response = "I can see what appears to be a cheque, but the image quality is too low for me to accurately extract the details. Please upload a clearer, well-lit image of the cheque.";
+        
+        // Save the assistant's response to conversation history
+        await storage.saveAIMessage({
+          user_id: 0,
+          content: response,
+          role: "assistant",
+          conversation_id: conversationId
+        });
+        
+        return response;
+      }
+      
+      // Store the extracted cheque information in the conversation state
+      const state = conversationStates[conversationId] || {};
+      state.extractedCheques = extractionResult.cheques;
+      state.currentChequeIndex = 0;
+      state.currentCommand = "process_cheque";
+      state.step = "confirm_extraction";
+      conversationStates[conversationId] = state;
+      
+      let response = '';
+      
+      // Format the response for a single cheque
+      if (extractionResult.numberOfCheques === 1) {
+        const cheque = extractionResult.cheques[0];
+        
+        // Save initial information to state
+        state.pendingData = {
+          chequeNumber: cheque.chequeNumber,
+          amount: cheque.amount
+        };
+        
+        response = `I've found a cheque in your image! Here's what I extracted:
+        
+Cheque Number: ${cheque.chequeNumber || 'Not detected'}
+Amount: ${cheque.amount || 'Not detected'}
+Date: ${cheque.date || 'Not detected'}
+Payee: ${cheque.payeeName || 'Not detected'}
+Bank: ${cheque.bankName || 'Not detected'}
+
+Is this information correct? If any details are wrong, please tell me the corrections.
+Would you like to create a new transaction with this cheque?`;
+      } 
+      // Format the response for multiple cheques
+      else {
+        const firstCheque = extractionResult.cheques[0];
+        
+        // Save initial information to state for the first cheque
+        state.pendingData = {
+          chequeNumber: firstCheque.chequeNumber,
+          amount: firstCheque.amount
+        };
+        
+        response = `I've found ${extractionResult.numberOfCheques} cheques in your image! Let's process them one by one.\n\nHere's the first cheque:\n\n`;
+        response += `Cheque Number: ${firstCheque.chequeNumber || 'Not detected'}\n`;
+        response += `Amount: ${firstCheque.amount || 'Not detected'}\n`;
+        response += `Date: ${firstCheque.date || 'Not detected'}\n`;
+        response += `Payee: ${firstCheque.payeeName || 'Not detected'}\n`;
+        response += `Bank: ${firstCheque.bankName || 'Not detected'}\n\n`;
+        response += `Is this information correct? If any details are wrong, please tell me the corrections.\nWould you like to create a new transaction with this cheque?`;
+      }
+      
+      // Save the assistant's response to conversation history
+      await storage.saveAIMessage({
+        user_id: 0,
+        content: response,
+        role: "assistant",
+        conversation_id: conversationId
+      });
+      
+      return response;
+    } finally {
+      // Clean up the temporary file
+      if (fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+      }
+    }
+  } catch (error) {
+    console.error("Error processing cheque document:", error);
+    
+    const errorResponse = "I had trouble processing your document. Please make sure it's a clear image of a bank cheque and try again.";
+    
+    // Save the error response to conversation history
+    await storage.saveAIMessage({
+      user_id: 0,
+      content: errorResponse,
+      role: "assistant",
+      conversation_id: conversationId
+    });
+    
+    return errorResponse;
+  }
+}
+
+/**
  * Processes an image and extracts relevant information
  * @param imageBase64 The base64-encoded image data
  * @returns Extracted information from the image
@@ -1144,21 +1289,42 @@ export async function processImage(imageBase64: string) {
         {
           role: "system",
           content: `You are an AI assistant designed to extract information from cheque images. 
-                    Extract the following information in JSON format:
+                    First, determine if the image contains one or more bank cheques. If the image clearly doesn't contain bank cheques, respond with {"isCheque": false}.
+
+                    If the image contains cheques, identify each distinct cheque in the image.
+                    For each cheque identified, extract the following information:
                     - chequeNumber: the cheque number
                     - amount: the dollar amount
                     - date: the date on the cheque
                     - payeeName: the name of the payee (recipient)
                     - bankName: the bank name if visible
                     
-                    Return the response as a valid JSON object.`
+                    Return the response as a valid JSON object in the following format:
+                    {
+                      "isCheque": true,
+                      "numberOfCheques": n,
+                      "cheques": [
+                        {
+                          "chequeNumber": "string",
+                          "amount": "string",
+                          "date": "string",
+                          "payeeName": "string",
+                          "bankName": "string"
+                        },
+                        ...
+                      ],
+                      "confidence": 0.0 to 1.0
+                    }
+                    
+                    Set the confidence score based on the clarity of the image and your certainty of the extracted information.
+                    If the image is too blurry or unclear to extract reliable information, set confidence to below 0.5.`
         },
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: "Extract information from this cheque image."
+              text: "Analyze this image and determine if it contains bank cheques. If so, extract the detailed information from each cheque."
             },
             {
               type: "image_url",
@@ -1170,7 +1336,7 @@ export async function processImage(imageBase64: string) {
         },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 800,
+      max_tokens: 1000,
     });
 
     const result = response.choices[0].message.content;
