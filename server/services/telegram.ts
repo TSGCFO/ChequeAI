@@ -12,6 +12,8 @@ let bot: TelegramBot | null = null;
 const isDeployedEnvironment = process.env.REPLIT_DEPLOYMENT === 'true' || 
                              process.env.NODE_ENV === 'production';
 
+// Bot will automatically be enabled in production environments
+
 // Check if we should run the Telegram bot
 // IMPORTANT: In development, we keep it disabled by default to prevent polling conflicts
 // In production, we enable it by default unless explicitly disabled
