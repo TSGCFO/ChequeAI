@@ -731,6 +731,12 @@ async function handleCommands(userMessage: string, conversationId: string): Prom
         response = modifyResult.response;
         updatedState = modifyResult.updatedState;
         break;
+
+      case "process_cheque":
+        const chequeResult = await handleChequeProcessingCommand(userMessage, conversationId, state);
+        response = chequeResult.response;
+        updatedState = chequeResult.updatedState;
+        break;
         
       // Add other command handlers here
       
