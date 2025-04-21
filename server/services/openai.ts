@@ -1147,13 +1147,19 @@ async function handleCommands(userMessage: string, conversationId: string): Prom
   if (state.currentCommand) {
     // Check for cancel command first
     if (userMessage.trim().toLowerCase() === "/cancel" || userMessage.trim().toLowerCase() === "cancel") {
+      // Preserve test mode flag if it exists
+      const testMode = state.testMode;
+      
       conversationStates[conversationId] = {
         currentCommand: undefined,
         pendingData: undefined,
-        step: undefined
+        step: undefined,
+        testMode // Preserve test mode flag
       };
       
-      const cancelResponse = "Command cancelled. How can I help you?";
+      const cancelResponse = testMode ? 
+        "🧪 TEST MODE: Command cancelled. How can I help you?" : 
+        "Command cancelled. How can I help you?";
       
       // Save assistant message to conversation history
       await storage.saveAIMessage({
@@ -1174,10 +1180,14 @@ async function handleCommands(userMessage: string, conversationId: string): Prom
         
         if (!originalImage) {
           // If no image data, reset state and ask for a new image
+          // Preserve test mode flag if it exists
+          const testMode = state.testMode;
+          
           conversationStates[conversationId] = {
             currentCommand: undefined,
             pendingData: undefined,
-            step: undefined
+            step: undefined,
+            testMode // Preserve test mode flag
           };
           
           const errorResponse = "I couldn't find the original image data. Please upload a clear image of a bank cheque and try again.";
@@ -1251,10 +1261,14 @@ async function handleCommands(userMessage: string, conversationId: string): Prom
           // Check if cheque was detected on second attempt
           if (!extractionResult.isCheque || extractionResult.confidence < 0.3) {
             // Reset state and ask for a better image
+            // Preserve test mode flag if it exists
+            const testMode = state.testMode;
+            
             conversationStates[conversationId] = {
               currentCommand: undefined,
               pendingData: undefined,
-              step: undefined
+              step: undefined,
+              testMode // Preserve test mode flag
             };
             
             const failureResponse = "I've tried my best but still can't detect a valid bank cheque in this image. Please upload a clearer image that shows the entire cheque, including the cheque number and amount fields.";
@@ -1312,10 +1326,14 @@ After confirming, I can help you create a new transaction with this cheque.`;
           console.error("Error in second-attempt cheque analysis:", error);
           
           // Reset state and ask for a better image
+          // Preserve test mode flag if it exists
+          const testMode = state.testMode;
+          
           conversationStates[conversationId] = {
             currentCommand: undefined,
             pendingData: undefined,
-            step: undefined 
+            step: undefined,
+            testMode // Preserve test mode flag
           };
           
           const errorResponse = "I'm having trouble analyzing this image. Please upload a clearer image of a bank cheque, making sure the cheque number and amount are clearly visible.";
@@ -1332,10 +1350,14 @@ After confirming, I can help you create a new transaction with this cheque.`;
         }
       } else {
         // User said it's not a cheque, reset state
+        // Preserve test mode flag if it exists
+        const testMode = state.testMode;
+          
         conversationStates[conversationId] = {
           currentCommand: undefined,
           pendingData: undefined,
-          step: undefined
+          step: undefined,
+          testMode // Preserve test mode flag
         };
         
         const notChequeResponse = "I understand. Please upload a clear image of a bank cheque to process it.";
@@ -1389,7 +1411,8 @@ After confirming, I can help you create a new transaction with this cheque.`;
         updatedState = {
           currentCommand: undefined,
           pendingData: undefined,
-          step: undefined
+          step: undefined,
+          testMode: state.testMode // Preserve test mode flag
         };
     }
 
@@ -1690,13 +1713,22 @@ Remember, you can only modify the date, cheque number, amount, and vendor ID.`;
       /create\s+(?:a\s+)?deposit/i.test(trimmedMessage) ||
       /make\s+(?:a\s+)?deposit/i.test(trimmedMessage)) {
     
+    // Preserve test mode flag if it exists
+    const testMode = conversationStates[conversationId]?.testMode;
+    
     conversationStates[conversationId] = {
       currentCommand: "/deposit",
       pendingData: {},
-      step: "askCustomerId"
+      step: "askCustomerId",
+      testMode // Preserve test mode flag
     };
     
-    const response = "Let's create a new customer deposit. Please provide the customer name or ID (or type /cancel to cancel):";
+    let response = "Let's create a new customer deposit. Please provide the customer name or ID (or type /cancel to cancel):";
+    
+    // Add note if in test mode
+    if (testMode) {
+      response = "🧪 TEST MODE: " + response + "\n(No actual database changes will be made)";
+    }
     
     // Save assistant message to conversation history
     await storage.saveAIMessage({
