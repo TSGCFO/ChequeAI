@@ -4,12 +4,12 @@ import * as schema from "@shared/schema";
 
 const { Pool } = pg;
 
-// Priority: Use Supabase URL if available, otherwise fall back to Replit's DATABASE_URL
-const databaseUrl = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
+// Only use Supabase database
+const databaseUrl = process.env.SUPABASE_DATABASE_URL;
 
 if (!databaseUrl) {
   throw new Error(
-    "No database connection string available. Please set SUPABASE_DATABASE_URL or DATABASE_URL.",
+    "No Supabase database connection string available. Please set SUPABASE_DATABASE_URL.",
   );
 }
 

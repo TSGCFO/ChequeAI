@@ -2,6 +2,14 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
+// Ensure we always use Supabase database
+if (!process.env.SUPABASE_DATABASE_URL) {
+  throw new Error("SUPABASE_DATABASE_URL environment variable not set. Please configure the Supabase database.");
+}
+
+// Set DATABASE_URL to SUPABASE_DATABASE_URL for Drizzle compatibility
+process.env.DATABASE_URL = process.env.SUPABASE_DATABASE_URL;
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
