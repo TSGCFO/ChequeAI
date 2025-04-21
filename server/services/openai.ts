@@ -991,6 +991,214 @@ async function handleCommands(userMessage: string, conversationId: string): Prom
   
   // Check if we're in the middle of a command flow
   if (state.currentCommand) {
+    // Check for cancel command first
+    if (userMessage.trim().toLowerCase() === "/cancel" || userMessage.trim().toLowerCase() === "cancel") {
+      conversationStates[conversationId] = {
+        currentCommand: undefined,
+        pendingData: undefined,
+        step: undefined
+      };
+      
+      const cancelResponse = "Command cancelled. How can I help you?";
+      
+      // Save assistant message to conversation history
+      await storage.saveAIMessage({
+        user_id: 0,
+        content: cancelResponse,
+        role: "assistant",
+        conversation_id: conversationId
+      });
+      
+      return cancelResponse;
+    }
+    
+    // Special handling for check_for_cheque command
+    if (state.currentCommand === "check_for_cheque") {
+      if (userMessage.trim().toLowerCase() === "yes") {
+        // Extract the original image from the state
+        const originalImage = state.pendingData?.originalImage;
+        
+        if (!originalImage) {
+          // If no image data, reset state and ask for a new image
+          conversationStates[conversationId] = {
+            currentCommand: undefined,
+            pendingData: undefined,
+            step: undefined
+          };
+          
+          const errorResponse = "I couldn't find the original image data. Please upload a clear image of a bank cheque and try again.";
+          
+          // Save to conversation history
+          await storage.saveAIMessage({
+            user_id: 0,
+            content: errorResponse,
+            role: "assistant",
+            conversation_id: conversationId
+          });
+          
+          return errorResponse;
+        }
+        
+        try {
+          // Try again with a more lenient detection approach
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "system",
+                content: `You are an AI assistant focused on bank cheque detection.
+                          The user has confirmed they're trying to upload a bank cheque image.
+                          Look very carefully at the image for anything that resembles a bank cheque or check.
+                          Even if the image is low quality, try to detect if there's a rectangular document with 
+                          fields for amounts, dates, signature lines, bank information, etc.
+                          
+                          Return the response as a valid JSON object in the following format:
+                          {
+                            "isCheque": true/false,
+                            "numberOfCheques": n,
+                            "cheques": [
+                              {
+                                "chequeNumber": "string",
+                                "amount": "string", 
+                                "bankName": "string"
+                              }
+                            ],
+                            "confidence": 0.0 to 1.0
+                          }`
+              },
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: "The user has confirmed this is a bank cheque image. Please look carefully and try to identify and extract information from any cheques in this image."
+                  },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: `data:image/jpeg;base64,${originalImage}`
+                    }
+                  }
+                ],
+              },
+            ],
+            response_format: { type: "json_object" },
+            max_tokens: 1000,
+          });
+      
+          const result = response.choices[0].message.content;
+          
+          if (!result) {
+            throw new Error("No response from image analysis");
+          }
+          
+          const extractionResult = JSON.parse(result);
+          
+          // Check if cheque was detected on second attempt
+          if (!extractionResult.isCheque || extractionResult.confidence < 0.3) {
+            // Reset state and ask for a better image
+            conversationStates[conversationId] = {
+              currentCommand: undefined,
+              pendingData: undefined,
+              step: undefined
+            };
+            
+            const failureResponse = "I've tried my best but still can't detect a valid bank cheque in this image. Please upload a clearer image that shows the entire cheque, including the cheque number and amount fields.";
+            
+            // Save to conversation history
+            await storage.saveAIMessage({
+              user_id: 0,
+              content: failureResponse,
+              role: "assistant",
+              conversation_id: conversationId
+            });
+            
+            return failureResponse;
+          }
+          
+          // Process the cheque as normal
+          // Store the extracted cheque information in the conversation state
+          const updatedState = { 
+            pendingData: { 
+              extractedCheques: extractionResult.cheques,
+              currentChequeIndex: 0
+            },
+            currentCommand: "process_cheque",
+            step: "confirm_extraction"
+          };
+          
+          conversationStates[conversationId] = updatedState;
+          
+          // Format response for the first cheque
+          const cheque = extractionResult.cheques[0];
+          const successResponse = `On second look, I've found a cheque! Here's what I was able to extract:
+          
+Cheque Number: ${cheque.chequeNumber || 'Not detected'}
+Amount: ${cheque.amount || 'Not detected'} 
+Bank: ${cheque.bankName || 'Not detected'}
+
+Please confirm if this information is correct:
+1. Is the cheque number "${cheque.chequeNumber || 'Not detected'}" correct?
+2. Is the amount "${cheque.amount || 'Not detected'}" correct?
+3. Is the bank "${cheque.bankName || 'Not detected'}" correct?
+
+After confirming, I can help you create a new transaction with this cheque.`;
+          
+          // Save the assistant's response to conversation history
+          await storage.saveAIMessage({
+            user_id: 0,
+            content: successResponse,
+            role: "assistant", 
+            conversation_id: conversationId
+          });
+          
+          return successResponse;
+          
+        } catch (error) {
+          console.error("Error in second-attempt cheque analysis:", error);
+          
+          // Reset state and ask for a better image
+          conversationStates[conversationId] = {
+            currentCommand: undefined,
+            pendingData: undefined,
+            step: undefined 
+          };
+          
+          const errorResponse = "I'm having trouble analyzing this image. Please upload a clearer image of a bank cheque, making sure the cheque number and amount are clearly visible.";
+          
+          // Save to conversation history
+          await storage.saveAIMessage({
+            user_id: 0,
+            content: errorResponse,
+            role: "assistant",
+            conversation_id: conversationId
+          });
+          
+          return errorResponse;
+        }
+      } else {
+        // User said it's not a cheque, reset state
+        conversationStates[conversationId] = {
+          currentCommand: undefined,
+          pendingData: undefined,
+          step: undefined
+        };
+        
+        const notChequeResponse = "I understand. Please upload a clear image of a bank cheque to process it.";
+        
+        // Save to conversation history
+        await storage.saveAIMessage({
+          user_id: 0,
+          content: notChequeResponse,
+          role: "assistant",
+          conversation_id: conversationId
+        });
+        
+        return notChequeResponse;
+      }
+    }
+    
+    // For other commands, use switch statement
     let response: string;
     let updatedState;
 
@@ -1453,7 +1661,7 @@ export async function processChequeDocument(
       
       // Check if the image contains cheques
       if (!extractionResult.isCheque) {
-        const response = "I don't see any bank cheques in the image. Please confirm if you're trying to upload a cheque image. If so, please upload a clearer image of the cheque(s).";
+        const response = "I don't see any bank cheques in the image. Were you trying to upload a cheque image? If yes, please reply 'yes' and I'll try again with a different detection method. Otherwise, please upload a clear image of a bank cheque.";
         
         // Save the assistant's response to conversation history
         await storage.saveAIMessage({
@@ -1463,12 +1671,18 @@ export async function processChequeDocument(
           conversation_id: conversationId
         });
         
+        // Set the state to wait for user confirmation
+        const state = conversationStates[conversationId] || {};
+        state.currentCommand = "check_for_cheque";
+        state.pendingData = { originalImage: base64Data };
+        conversationStates[conversationId] = state;
+        
         return response;
       }
       
       // Check confidence level
       if (extractionResult.confidence < 0.5) {
-        const response = "I can see what appears to be a cheque, but the image quality is too low for me to accurately extract the details. Please upload a clearer, well-lit image of the cheque.";
+        const response = "I can see what appears to be a cheque, but the image quality is too low for me to accurately extract the details. Please upload a clearer, well-lit image of the cheque. Make sure the cheque number and amount are clearly visible in the image.";
         
         // Save the assistant's response to conversation history
         await storage.saveAIMessage({
@@ -1508,12 +1722,14 @@ export async function processChequeDocument(
         
 Cheque Number: ${cheque.chequeNumber || 'Not detected'}
 Amount: ${cheque.amount || 'Not detected'}
-Date: ${cheque.date || 'Not detected'}
-Payee: ${cheque.payeeName || 'Not detected'}
 Bank: ${cheque.bankName || 'Not detected'}
 
-Is this information correct? If any details are wrong, please tell me the corrections.
-Would you like to create a new transaction with this cheque?`;
+Please confirm if this information is correct:
+1. Is the cheque number "${cheque.chequeNumber || 'Not detected'}" correct?
+2. Is the amount "${cheque.amount || 'Not detected'}" correct?
+3. Is the bank "${cheque.bankName || 'Not detected'}" correct?
+
+After confirming, I can help you create a new transaction with this cheque.`;
       } 
       // Format the response for multiple cheques
       else {
@@ -1529,10 +1745,12 @@ Would you like to create a new transaction with this cheque?`;
         response = `I've found ${extractionResult.numberOfCheques} cheques in your image! Let's process them one by one.\n\nHere's the first cheque:\n\n`;
         response += `Cheque Number: ${firstCheque.chequeNumber || 'Not detected'}\n`;
         response += `Amount: ${firstCheque.amount || 'Not detected'}\n`;
-        response += `Date: ${firstCheque.date || 'Not detected'}\n`;
-        response += `Payee: ${firstCheque.payeeName || 'Not detected'}\n`;
         response += `Bank: ${firstCheque.bankName || 'Not detected'}\n\n`;
-        response += `Is this information correct? If any details are wrong, please tell me the corrections.\nWould you like to create a new transaction with this cheque?`;
+        response += `Please confirm if this information is correct:\n`;
+        response += `1. Is the cheque number "${firstCheque.chequeNumber || 'Not detected'}" correct?\n`;
+        response += `2. Is the amount "${firstCheque.amount || 'Not detected'}" correct?\n`;
+        response += `3. Is the bank "${firstCheque.bankName || 'Not detected'}" correct?\n\n`;
+        response += `After confirming, I can help you create a new transaction with this cheque.`;
       }
       
       // Save the assistant's response to conversation history
