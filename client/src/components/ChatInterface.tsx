@@ -32,6 +32,7 @@ export default function ChatInterface({ onClose }: ChatInterfaceProps) {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -60,6 +61,14 @@ export default function ChatInterface({ onClose }: ChatInterfaceProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+  
+  // Focus input field when component mounts
+  useEffect(() => {
+    // Small delay to ensure the DOM is fully rendered
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+  }, []);
   
   // Check for recently processed documents when component mounts
   useEffect(() => {
@@ -179,6 +188,10 @@ export default function ChatInterface({ onClose }: ChatInterfaceProps) {
       setMessages((prevMessages) => [...prevMessages, errorMessage]);
     } finally {
       setIsLoading(false);
+      // Focus the input element after sending a message
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
     }
   };
 
@@ -411,6 +424,7 @@ export default function ChatInterface({ onClose }: ChatInterfaceProps) {
           </Button>
           <div className="relative flex-1">
             <Input
+              ref={inputRef}
               type="text"
               placeholder="Ask your AI assistant..."
               value={message}
