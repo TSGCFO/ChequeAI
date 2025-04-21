@@ -228,6 +228,125 @@ The transaction has been added to the database. You can view it in the transacti
 }
 
 /**
+ * Handle the /deposit command
+ * @param userMessage User's message
+ * @param conversationId Conversation ID
+ * @param state Current conversation state
+ * @returns Response message and updated state
+ */
+async function handleDepositCommand(
+  userMessage: string, 
+  conversationId: string, 
+  state: ConversationState[string]
+): Promise<{ response: string; updatedState: ConversationState[string] }> {
+  // Initialize state if not exists
+  if (!state.step) {
+    return {
+      response: "Let's create a new customer deposit. Please provide the customer ID:",
+      updatedState: {
+        ...state,
+        currentCommand: "/deposit",
+        pendingData: {},
+        step: "askCustomerId"
+      }
+    };
+  }
+
+  // Process based on current step
+  switch (state.step) {
+    case "askCustomerId":
+      const customerId = parseInt(userMessage.trim());
+      if (isNaN(customerId)) {
+        return {
+          response: "Customer ID must be a number. Please try again:",
+          updatedState: state
+        };
+      }
+
+      // Verify customer exists
+      try {
+        const customer = await storage.getCustomer(customerId);
+        if (!customer) {
+          return {
+            response: "Customer not found. Please provide a valid customer ID:",
+            updatedState: state
+          };
+        }
+
+        return {
+          response: `Customer: ${customer.customer_name}. Now, please provide the deposit amount:`,
+          updatedState: {
+            ...state,
+            pendingData: { ...state.pendingData, customerId },
+            step: "askAmount"
+          }
+        };
+      } catch (error) {
+        console.error("Error verifying customer:", error);
+        return {
+          response: "Error verifying customer. Please try again:",
+          updatedState: state
+        };
+      }
+
+    case "askAmount":
+      const amountInput = userMessage.trim().replace(/[$,]/g, '');
+      const amount = parseFloat(amountInput);
+      
+      if (isNaN(amount) || amount <= 0) {
+        return {
+          response: "Please provide a valid positive amount:",
+          updatedState: state
+        };
+      }
+
+      // Create the deposit
+      try {
+        const deposit = await storage.createCustomerDeposit({
+          customer_id: state.pendingData?.customerId as number,
+          amount: amount.toFixed(2)
+        });
+
+        const customer = await storage.getCustomer(deposit.customer_id);
+        
+        return {
+          response: `Deposit successfully created for ${customer?.customer_name || 'Customer'}.
+          
+Amount: $${deposit.amount}
+Date: ${new Date().toLocaleDateString()}
+
+The deposit has been added to the database.`,
+          updatedState: {
+            currentCommand: undefined,
+            pendingData: undefined,
+            step: undefined
+          }
+        };
+      } catch (error) {
+        console.error("Error creating deposit:", error);
+        return {
+          response: "Error creating the deposit. Please try again later.",
+          updatedState: {
+            currentCommand: undefined,
+            pendingData: undefined,
+            step: undefined
+          }
+        };
+      }
+
+    default:
+      return {
+        response: "Something went wrong with the deposit creation process. Let's start over. Please provide the customer ID:",
+        updatedState: {
+          ...state,
+          step: "askCustomerId",
+          pendingData: {}
+        }
+      };
+  }
+}
+
+/**
  * Handle command-based interactions
  * @param userMessage User's message
  * @param conversationId Conversation ID
@@ -248,6 +367,12 @@ async function handleCommands(userMessage: string, conversationId: string): Prom
         const result = await handleNewTransactionCommand(userMessage, conversationId, state);
         response = result.response;
         updatedState = result.updatedState;
+        break;
+      
+      case "/deposit":
+        const depositResult = await handleDepositCommand(userMessage, conversationId, state);
+        response = depositResult.response;
+        updatedState = depositResult.updatedState;
         break;
         
       // Add other command handlers here
@@ -310,6 +435,26 @@ async function handleCommands(userMessage: string, conversationId: string): Prom
     return response;
   }
   
+  if (trimmedMessage === "/deposit") {
+    conversationStates[conversationId] = {
+      currentCommand: "/deposit",
+      pendingData: {},
+      step: "askCustomerId"
+    };
+    
+    const response = "Let's create a new customer deposit. Please provide the customer ID:";
+    
+    // Save assistant message to conversation history
+    await storage.saveAIMessage({
+      user_id: 0,
+      content: response,
+      role: "assistant",
+      conversation_id: conversationId
+    });
+    
+    return response;
+  }
+  
   // Add more command handlers here
   
   // Not a command, return null to continue with normal AI response
@@ -342,6 +487,7 @@ export async function generateAIResponse(userMessage: string, conversationId: st
                   You understand the following COMMANDS:
                   - /help - Display help information about available commands
                   - /new transaction - Start the process to create a new transaction
+                  - /deposit - Start the process to create a new customer deposit
                   - /find transaction - Find transaction details
                   - /summary - Get business summary
                   

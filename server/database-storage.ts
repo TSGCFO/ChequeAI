@@ -296,6 +296,31 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // Customer Deposits methods
+  async createCustomerDeposit(deposit: InsertCustomerDeposit): Promise<CustomerDeposit> {
+    try {
+      // Verify customer exists
+      const customer = await this.getCustomer(deposit.customer_id);
+      if (!customer) {
+        throw new Error("Customer not found");
+      }
+      
+      // Insert the deposit - only include customer_id and amount as specified
+      const [result] = await db
+        .insert(customerDeposits)
+        .values({
+          customer_id: deposit.customer_id,
+          amount: deposit.amount
+        })
+        .returning();
+      
+      return result;
+    } catch (error) {
+      console.error("Error creating customer deposit:", error);
+      throw error;
+    }
+  }
+
   // AI Assistant methods
   async saveAIMessage(message: InsertAIMessage): Promise<AIMessage> {
     const [result] = await db
