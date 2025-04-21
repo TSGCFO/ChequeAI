@@ -247,11 +247,30 @@ async function handleNewTransactionCommand(
             vendor_id: vendorId
           };
 
-          const transaction = await storage.createTransaction(newTransaction);
+          let transaction;
+          if (state.testMode) {
+            // In test mode, create a mock transaction but don't save to database
+            transaction = {
+              ...newTransaction,
+              transaction_id: Math.floor(1000 + Math.random() * 9000), // Random 4-digit ID
+              date: new Date().toISOString().split('T')[0],
+              status: "pending",
+              profit_amount: "0.00"
+            };
+            console.log("TEST MODE: Transaction simulated but not saved to database:", transaction);
+          } else {
+            // Normal mode - save to database
+            transaction = await storage.createTransaction(newTransaction);
+          }
 
           // Format response with transaction details
+          const responsePrefix = state.testMode ? "🧪 TEST MODE: " : "";
+          const responseSuffix = state.testMode ? 
+            "This is a simulated transaction and has NOT been saved to the database." : 
+            "The transaction has been added to the database. You can view it in the transactions list.";
+
           return {
-            response: `Transaction created successfully!
+            response: `${responsePrefix}Transaction created successfully!
 
 \`\`\`json
 {
@@ -264,11 +283,12 @@ async function handleNewTransactionCommand(
 }
 \`\`\`
 
-The transaction has been added to the database. You can view it in the transactions list.`,
+${responseSuffix}`,
             updatedState: {
               currentCommand: undefined,
               pendingData: undefined,
-              step: undefined
+              step: undefined,
+              testMode: state.testMode // Preserve test mode flag
             }
           };
         } catch (error) {
@@ -278,7 +298,8 @@ The transaction has been added to the database. You can view it in the transacti
             updatedState: {
               currentCommand: undefined,
               pendingData: undefined,
-              step: undefined
+              step: undefined,
+              testMode: state.testMode // Preserve test mode flag
             }
           };
         }
@@ -575,8 +596,21 @@ Type "confirm" to proceed or "cancel" to abort.`,
         const updateData = state.pendingData?.updateData as Partial<InsertTransaction>;
         
         try {
-          // Make the update (only using the allowed fields)
-          const updatedTransaction = await storage.updateTransaction(transactionId, updateData);
+          let updatedTransaction;
+          
+          // Check if in test mode
+          if (state.testMode) {
+            // In test mode, create a mock updated transaction but don't save to database
+            const originalTransaction = state.pendingData?.originalTransaction;
+            updatedTransaction = {
+              ...originalTransaction,
+              ...updateData
+            };
+            console.log("TEST MODE: Transaction update simulated but not saved to database:", updatedTransaction);
+          } else {
+            // Normal mode - save to database
+            updatedTransaction = await storage.updateTransaction(transactionId, updateData);
+          }
           
           if (!updatedTransaction) {
             return {
@@ -584,14 +618,20 @@ Type "confirm" to proceed or "cancel" to abort.`,
               updatedState: {
                 currentCommand: undefined,
                 pendingData: undefined,
-                step: undefined
+                step: undefined,
+                testMode: state.testMode // Preserve test mode flag
               }
             };
           }
           
           // Format response with updated transaction details
+          const responsePrefix = state.testMode ? "🧪 TEST MODE: " : "";
+          const responseSuffix = state.testMode ? 
+            "This is a simulated update and has NOT been saved to the database." : 
+            "The changes have been saved to the database.";
+            
           return {
-            response: `Transaction #${updatedTransaction.transaction_id} has been successfully updated!
+            response: `${responsePrefix}Transaction #${updatedTransaction.transaction_id} has been successfully updated!
 
 \`\`\`json
 {
@@ -604,11 +644,12 @@ Type "confirm" to proceed or "cancel" to abort.`,
 }
 \`\`\`
 
-The changes have been saved to the database.`,
+${responseSuffix}`,
             updatedState: {
               currentCommand: undefined,
               pendingData: undefined,
-              step: undefined
+              step: undefined,
+              testMode: state.testMode // Preserve test mode flag
             }
           };
         } catch (error) {
@@ -618,7 +659,8 @@ The changes have been saved to the database.`,
             updatedState: {
               currentCommand: undefined,
               pendingData: undefined,
-              step: undefined
+              step: undefined,
+              testMode: state.testMode // Preserve test mode flag
             }
           };
         }
@@ -628,7 +670,8 @@ The changes have been saved to the database.`,
           updatedState: {
             currentCommand: undefined,
             pendingData: undefined,
-            step: undefined
+            step: undefined,
+            testMode: state.testMode // Preserve test mode flag
           }
         };
       } else {
@@ -1020,24 +1063,49 @@ async function handleDepositCommand(
 
       // Create the deposit
       try {
-        const deposit = await storage.createCustomerDeposit({
-          customer_id: state.pendingData?.customerId as number,
-          amount: amount.toFixed(2)
-        });
-
-        const customer = await storage.getCustomer(deposit.customer_id);
+        let deposit;
+        let customer;
+        
+        // Check if in test mode
+        if (state.testMode) {
+          // In test mode, create a mock deposit but don't save to database
+          const customerId = state.pendingData?.customerId as number;
+          customer = await storage.getCustomer(customerId);
+          
+          deposit = {
+            deposit_id: Math.floor(1000 + Math.random() * 9000), // Random 4-digit ID
+            customer_id: customerId,
+            amount: amount.toFixed(2),
+            date: new Date().toISOString().split('T')[0]
+          };
+          console.log("TEST MODE: Deposit simulated but not saved to database:", deposit);
+        } else {
+          // Normal mode - save to database
+          deposit = await storage.createCustomerDeposit({
+            customer_id: state.pendingData?.customerId as number,
+            amount: amount.toFixed(2)
+          });
+          customer = await storage.getCustomer(deposit.customer_id);
+        }
+        
+        // Format response with deposit details
+        const responsePrefix = state.testMode ? "🧪 TEST MODE: " : "";
+        const responseSuffix = state.testMode ? 
+          "This is a simulated deposit and has NOT been saved to the database." : 
+          "The deposit has been added to the database.";
         
         return {
-          response: `Deposit successfully created for ${customer?.customer_name || 'Customer'}.
+          response: `${responsePrefix}Deposit successfully created for ${customer?.customer_name || 'Customer'}.
           
 Amount: $${deposit.amount}
 Date: ${new Date().toLocaleDateString()}
 
-The deposit has been added to the database.`,
+${responseSuffix}`,
           updatedState: {
             currentCommand: undefined,
             pendingData: undefined,
-            step: undefined
+            step: undefined,
+            testMode: state.testMode // Preserve test mode flag
           }
         };
       } catch (error) {
@@ -1047,7 +1115,8 @@ The deposit has been added to the database.`,
           updatedState: {
             currentCommand: undefined,
             pendingData: undefined,
-            step: undefined
+            step: undefined,
+            testMode: state.testMode // Preserve test mode flag
           }
         };
       }
