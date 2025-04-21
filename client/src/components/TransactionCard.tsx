@@ -1,7 +1,6 @@
 import { Edit, File, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
 import type { TransactionWithDetails } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -10,21 +9,7 @@ interface TransactionCardProps {
 }
 
 export default function TransactionCard({ transaction }: TransactionCardProps) {
-  // Function to get the appropriate status badge
-  const getStatusBadge = (status: string | null) => {
-    if (!status) return <Badge className="bg-gray-100 text-gray-600">Unknown</Badge>;
-    
-    switch (status) {
-      case "completed":
-        return <Badge className="bg-green-100 text-green-600">Completed</Badge>;
-      case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-600">Pending</Badge>;
-      case "bounced":
-        return <Badge className="bg-red-100 text-red-500">Bounced</Badge>;
-      default:
-        return <Badge className="bg-gray-100 text-gray-600">{status}</Badge>;
-    }
-  };
+  // Status badge functionality has been removed since status field doesn't exist in the schema
 
   // Format the date
   const formattedDate = transaction.date 
@@ -40,8 +25,8 @@ export default function TransactionCard({ transaction }: TransactionCardProps) {
           </div>
           <div>
             <div className="flex items-center">
-              <p className="font-medium">{transaction.customer?.customer_name || "Unknown Customer"}</p>
-              <span className="ml-2">{getStatusBadge(transaction.status)}</span>
+              <p className="font-medium">{transaction.customer ? transaction.customer.customer_name : "Missing Customer"}</p>
+              {/* Remove status badge as status field doesn't exist in the schema */}
             </div>
             <p className="text-sm text-gray-500">Cheque #{transaction.cheque_number}</p>
             <div className="mt-1 flex flex-wrap items-center text-xs text-gray-500">
@@ -51,18 +36,15 @@ export default function TransactionCard({ transaction }: TransactionCardProps) {
               </span>
               <span className="flex items-center">
                 <User className="mr-1 h-3 w-3" />
-                Vendor: {transaction.vendor?.vendor_name || "Unknown Vendor"}
+                Vendor: {transaction.vendor ? transaction.vendor.vendor_name : "Missing Vendor"}
               </span>
             </div>
           </div>
         </div>
         <div className="text-right">
           <p className="text-lg font-semibold">${parseFloat(transaction.cheque_amount?.toString() || "0").toFixed(2)}</p>
-          <p className={`text-xs ${transaction.status === "bounced" ? "text-red-500" : "text-green-600"}`}>
-            {transaction.status === "bounced" 
-              ? `Fee Reversal: -$${parseFloat(transaction.customer_fee?.toString() || "0").toFixed(2)}`
-              : `Profit: $${parseFloat(transaction.profit?.toString() || "0").toFixed(2)}`
-            }
+          <p className="text-xs text-green-600">
+            Profit: ${parseFloat(transaction.profit?.toString() || "0").toFixed(2)}
           </p>
         </div>
       </div>
