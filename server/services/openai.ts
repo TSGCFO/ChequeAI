@@ -59,12 +59,24 @@ async function handleNewTransactionCommand(
   // Initialize state if not exists
   if (!state.step) {
     return {
-      response: "Let's create a new transaction. Please provide the customer ID:",
+      response: "Let's create a new transaction. Please provide the customer ID (or type /cancel to cancel):",
       updatedState: {
         ...state,
         currentCommand: "/new transaction",
         pendingData: {},
         step: "askCustomerId"
+      }
+    };
+  }
+  
+  // Check for cancel command
+  if (userMessage.trim().toLowerCase() === "/cancel") {
+    return {
+      response: "Transaction creation cancelled. How can I help you?",
+      updatedState: {
+        currentCommand: undefined,
+        pendingData: undefined,
+        step: undefined
       }
     };
   }
@@ -243,12 +255,24 @@ async function handleDepositCommand(
   // Initialize state if not exists
   if (!state.step) {
     return {
-      response: "Let's create a new customer deposit. Please provide the customer ID:",
+      response: "Let's create a new customer deposit. Please provide the customer ID (or type /cancel to cancel):",
       updatedState: {
         ...state,
         currentCommand: "/deposit",
         pendingData: {},
         step: "askCustomerId"
+      }
+    };
+  }
+  
+  // Check for cancel command
+  if (userMessage.trim().toLowerCase() === "/cancel") {
+    return {
+      response: "Deposit creation cancelled. How can I help you?",
+      updatedState: {
+        currentCommand: undefined,
+        pendingData: undefined,
+        step: undefined
       }
     };
   }
@@ -423,7 +447,7 @@ async function handleCommands(userMessage: string, conversationId: string): Prom
       step: "askCustomerId"
     };
     
-    const response = "Let's create a new transaction. Please provide the customer ID:";
+    const response = "Let's create a new transaction. Please provide the customer ID (or type /cancel to cancel):";
     
     // Save assistant message to conversation history
     await storage.saveAIMessage({
@@ -443,7 +467,7 @@ async function handleCommands(userMessage: string, conversationId: string): Prom
       step: "askCustomerId"
     };
     
-    const response = "Let's create a new customer deposit. Please provide the customer ID:";
+    const response = "Let's create a new customer deposit. Please provide the customer ID (or type /cancel to cancel):";
     
     // Save assistant message to conversation history
     await storage.saveAIMessage({
