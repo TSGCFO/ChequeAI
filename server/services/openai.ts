@@ -9,14 +9,14 @@ const openai = new OpenAI({
 
 // Help message for the assistant
 const HELP_MESSAGE = `
-I'm your AI assistant for Cheque Ledger Pro. I can help with the following commands:
+I'm your AI assistant for Cheque Ledger Pro. I can help with commands and natural language requests:
 
-Commands:
-- \`/new transaction\` - Create a new transaction (I'll ask for details)
-- \`/deposit\` - Create a new customer deposit (I'll ask for customer ID and amount)
-- \`/find transaction\` - Find transaction details (I'll ask for the ID)
-- \`/modify transaction\` - Modify an existing transaction (date, cheque number, amount, or vendor)
-- \`/summary\` - Get a summary of business metrics
+You can use either slash commands or natural language:
+- \`/new transaction\` or "create a new transaction" 
+- \`/deposit\` or "make a new deposit"
+- \`/find transaction\` or "find transaction details"
+- \`/modify transaction\` or "modify cheque number 00010572" or "change the amount of cheque 12345"
+- \`/summary\` or "show me a business summary" 
 - \`/help\` - Show this help message
 
 For general questions, just ask me directly about:
@@ -829,7 +829,139 @@ async function handleCommands(userMessage: string, conversationId: string): Prom
     return response;
   }
   
-  // Add more command handlers here
+  // Check for natural language commands
+  
+  // Check for "modify" or "change" commands
+  const modifyRegex = /modify|change|update|edit|alter/i;
+  const chequeNumberRegex = /(?:cheque|check)\s+(?:number|#)?\s*(\d+)/i;
+  const amountRegex = /(?:amount|value|sum)/i;
+  
+  if (modifyRegex.test(trimmedMessage)) {
+    // Check if it's trying to modify a transaction
+    const chequeNumberMatch = chequeNumberRegex.exec(userMessage);
+    
+    if (chequeNumberMatch && chequeNumberMatch[1]) {
+      const chequeNumber = chequeNumberMatch[1];
+      
+      // Try to find the transaction by cheque number
+      try {
+        const transactions = await storage.getTransactions();
+        const transaction = transactions.find(t => t.cheque_number === chequeNumber);
+        
+        if (transaction) {
+          conversationStates[conversationId] = {
+            currentCommand: "/modify transaction",
+            pendingData: { 
+              transactionId: transaction.transaction_id,
+              originalTransaction: transaction
+            },
+            step: "askFieldToModify"
+          };
+          
+          // If "amount" is mentioned, directly offer to modify the amount
+          if (amountRegex.test(trimmedMessage)) {
+            const response = `I found cheque #${chequeNumber} (Transaction #${transaction.transaction_id}). 
+            
+Current amount: $${transaction.cheque_amount}
+
+Please enter the new amount:`;
+            
+            // Save assistant message to conversation history
+            await storage.saveAIMessage({
+              user_id: 0,
+              content: response,
+              role: "assistant",
+              conversation_id: conversationId
+            });
+            
+            // Update state to skip directly to asking for the new amount
+            if (conversationStates[conversationId] && conversationStates[conversationId].pendingData) {
+              conversationStates[conversationId].pendingData.fieldToModify = "cheque_amount";
+              conversationStates[conversationId].step = "askNewValue";
+            }
+            
+            return response;
+          }
+          
+          // Otherwise, provide options to modify
+          const response = `I found cheque #${chequeNumber} (Transaction #${transaction.transaction_id}):
+          
+Cheque Number: ${transaction.cheque_number}
+Cheque Amount: $${transaction.cheque_amount}
+Date: ${transaction.date ? new Date(transaction.date.toString()).toLocaleDateString() : 'Not set'}
+${transaction.customer_id ? `Customer ID: ${transaction.customer_id}` : ''}
+${transaction.vendor_id ? `Vendor ID: ${transaction.vendor_id}` : ''}
+
+What would you like to modify? (Type the number):
+1. Date
+2. Cheque Number
+3. Cheque Amount
+4. Vendor ID
+
+Remember, you can only modify the date, cheque number, amount, and vendor ID.`;
+          
+          // Save assistant message to conversation history
+          await storage.saveAIMessage({
+            user_id: 0,
+            content: response,
+            role: "assistant",
+            conversation_id: conversationId
+          });
+          
+          return response;
+        }
+      } catch (error) {
+        console.error("Error finding transaction by cheque number:", error);
+      }
+    }
+  }
+  
+  // Check for natural language "new transaction" commands
+  if (/new\s+(?:transaction|cheque|check)/i.test(trimmedMessage) || 
+      /create\s+(?:a\s+)?(?:transaction|cheque|check)/i.test(trimmedMessage)) {
+    
+    conversationStates[conversationId] = {
+      currentCommand: "/new transaction",
+      pendingData: {},
+      step: "askCustomerId"
+    };
+    
+    const response = "Let's create a new transaction. Please provide the customer ID (or type /cancel to cancel):";
+    
+    // Save assistant message to conversation history
+    await storage.saveAIMessage({
+      user_id: 0,
+      content: response,
+      role: "assistant",
+      conversation_id: conversationId
+    });
+    
+    return response;
+  }
+  
+  // Check for natural language "deposit" commands
+  if (/new\s+deposit/i.test(trimmedMessage) || 
+      /create\s+(?:a\s+)?deposit/i.test(trimmedMessage) ||
+      /make\s+(?:a\s+)?deposit/i.test(trimmedMessage)) {
+    
+    conversationStates[conversationId] = {
+      currentCommand: "/deposit",
+      pendingData: {},
+      step: "askCustomerId"
+    };
+    
+    const response = "Let's create a new customer deposit. Please provide the customer ID (or type /cancel to cancel):";
+    
+    // Save assistant message to conversation history
+    await storage.saveAIMessage({
+      user_id: 0,
+      content: response,
+      role: "assistant",
+      conversation_id: conversationId
+    });
+    
+    return response;
+  }
   
   // Not a command, return null to continue with normal AI response
   return null;
@@ -866,9 +998,9 @@ export async function generateAIResponse(userMessage: string, conversationId: st
                   - /find transaction - Find transaction details
                   - /summary - Get business summary
                   
-                  When the user asks about creating transactions or other system actions, remind them to use these slash commands.
+                  You can understand both slash commands like "/modify transaction" and natural language requests like "modify cheque number 00010572" or "change the amount of cheque 12345".
                   
-                  If a user asks a question that you don't have enough information for, direct them to use one of the available commands.
+                  If a user asks to modify or create something in natural language, try to understand and handle their request directly.
                   
                   For numerical values, always format currency with a dollar sign and two decimal places.
                   
