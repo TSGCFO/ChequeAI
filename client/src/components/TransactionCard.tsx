@@ -25,7 +25,7 @@ export default function TransactionCard({ transaction }: TransactionCardProps) {
           </div>
           <div>
             <div className="flex items-center">
-              <p className="font-medium">{transaction.customer ? transaction.customer.customer_name : "Missing Customer"}</p>
+              <p className="font-medium">Customer #{transaction.customer_id}</p>
               {/* Remove status badge as status field doesn't exist in the schema */}
             </div>
             <p className="text-sm text-gray-500">Cheque #{transaction.cheque_number}</p>
@@ -36,7 +36,7 @@ export default function TransactionCard({ transaction }: TransactionCardProps) {
               </span>
               <span className="flex items-center">
                 <User className="mr-1 h-3 w-3" />
-                Vendor: {transaction.vendor ? transaction.vendor.vendor_name : "Missing Vendor"}
+                Vendor: {transaction.vendor_id}
               </span>
             </div>
           </div>
