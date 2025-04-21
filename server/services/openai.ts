@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { storage } from "../storage";
-import { InsertTransaction, TransactionWithDetails } from "@shared/schema";
+import { InsertTransaction, TransactionWithDetails, Customer, Vendor } from "@shared/schema";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -57,6 +57,47 @@ type ConversationState = {
 const conversationStates: ConversationState = {};
 
 /**
+ * Helper function to find a customer by name or ID
+ * @param customerInput The customer name or ID entered by the user
+ * @returns The customer object if found, undefined otherwise
+ */
+async function findCustomerByNameOrId(customerInput: string): Promise<Customer | undefined> {
+  const customerId = parseInt(customerInput.trim());
+  
+  // First try to find by ID if input is a number
+  if (!isNaN(customerId)) {
+    return await storage.getCustomer(customerId);
+  }
+  
+  // If not a number, try to find by name
+  const allCustomers = await storage.getCustomers();
+  
+  // Case-insensitive search
+  return allCustomers.find(customer => 
+    customer.customer_name.toLowerCase().includes(customerInput.toLowerCase()));
+}
+
+/**
+ * Helper function to find a vendor by name or ID
+ * @param vendorInput The vendor name or ID entered by the user
+ * @returns The vendor object if found, undefined otherwise
+ */
+async function findVendorByNameOrId(vendorInput: string): Promise<Vendor | undefined> {
+  // First try to find by ID directly
+  const vendorById = await storage.getVendor(vendorInput.trim());
+  if (vendorById) {
+    return vendorById;
+  }
+  
+  // If not found by ID, try to find by name
+  const allVendors = await storage.getVendors();
+  
+  // Case-insensitive search
+  return allVendors.find(vendor => 
+    vendor.vendor_name.toLowerCase().includes(vendorInput.toLowerCase()));
+}
+
+/**
  * Handle the /new transaction command
  * @param userMessage User's message
  * @param conversationId Conversation ID
@@ -71,7 +112,7 @@ async function handleNewTransactionCommand(
   // Initialize state if not exists
   if (!state.step) {
     return {
-      response: "Let's create a new transaction. Please provide the customer ID (or type /cancel to cancel):",
+      response: "Let's create a new transaction. Please provide the customer name or ID (or type /cancel to cancel):",
       updatedState: {
         ...state,
         currentCommand: "/new transaction",
@@ -96,20 +137,20 @@ async function handleNewTransactionCommand(
   // Process based on current step
   switch (state.step) {
     case "askCustomerId":
-      const customerId = parseInt(userMessage.trim());
-      if (isNaN(customerId)) {
-        return {
-          response: "Customer ID must be a number. Please try again:",
-          updatedState: state
-        };
-      }
-
-      // Verify customer exists
+      // Try to find customer by name or ID
       try {
-        const customer = await storage.getCustomer(customerId);
+        const customerInput = userMessage.trim();
+        if (!customerInput) {
+          return {
+            response: "Please provide a customer name or ID:",
+            updatedState: state
+          };
+        }
+        
+        const customer = await findCustomerByNameOrId(customerInput);
         if (!customer) {
           return {
-            response: "Customer not found. Please provide a valid customer ID:",
+            response: "Customer not found. Please provide a valid customer name or ID:",
             updatedState: state
           };
         }
@@ -118,14 +159,14 @@ async function handleNewTransactionCommand(
           response: `Customer: ${customer.customer_name}. Now, please provide the cheque number:`,
           updatedState: {
             ...state,
-            pendingData: { ...state.pendingData, customerId },
+            pendingData: { ...state.pendingData, customerId: customer.customer_id },
             step: "askChequeNumber"
           }
         };
       } catch (error) {
-        console.error("Error verifying customer:", error);
+        console.error("Error finding customer:", error);
         return {
-          response: "Error verifying customer. Please try again with a valid customer ID:",
+          response: "Error finding customer. Please try again with a valid customer name or ID:",
           updatedState: state
         };
       }
@@ -161,7 +202,7 @@ async function handleNewTransactionCommand(
       }
 
       return {
-        response: "Finally, please provide the vendor ID:",
+        response: "Finally, please provide the vendor name or ID:",
         updatedState: {
           ...state,
           pendingData: { ...state.pendingData, amount: amountNumber.toString() },
@@ -170,23 +211,26 @@ async function handleNewTransactionCommand(
       };
 
     case "askVendorId":
-      const vendorId = userMessage.trim();
-      if (!vendorId) {
+      const vendorInput = userMessage.trim();
+      if (!vendorInput) {
         return {
-          response: "Vendor ID is required. Please provide a valid vendor ID:",
+          response: "Vendor name or ID is required. Please provide a valid vendor name or ID:",
           updatedState: state
         };
       }
 
       // Verify vendor exists
       try {
-        const vendor = await storage.getVendor(vendorId);
+        const vendor = await findVendorByNameOrId(vendorInput);
         if (!vendor) {
           return {
-            response: "Vendor not found. Please provide a valid vendor ID:",
+            response: "Vendor not found. Please provide a valid vendor name or ID:",
             updatedState: state
           };
         }
+        
+        // Store the vendor ID for transaction creation
+        const vendorId = vendor.vendor_id;
 
         // Create the transaction
         try {
@@ -243,7 +287,7 @@ The transaction has been added to the database. You can view it in the transacti
 
     default:
       return {
-        response: "Something went wrong with the transaction creation process. Let's start over. Please provide the customer ID:",
+        response: "Something went wrong with the transaction creation process. Let's start over. Please provide the customer name or ID:",
         updatedState: {
           ...state,
           step: "askCustomerId",
