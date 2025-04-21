@@ -1,6 +1,9 @@
 import OpenAI from "openai";
 import { storage } from "../storage";
 import { InsertTransaction, TransactionWithDetails } from "@shared/schema";
+import fs from "fs";
+import path from "path";
+import os from "os";
 
 // Initialize OpenAI with the API key from environment variables
 const openai = new OpenAI({ 
@@ -1073,6 +1076,57 @@ export async function generateAIResponse(userMessage: string, conversationId: st
   } catch (error) {
     console.error("Error generating AI response:", error);
     throw new Error("Failed to generate AI response");
+  }
+}
+
+/**
+ * Process a voice message and generate a response
+ * @param audioBuffer Buffer containing the voice message audio data
+ * @param conversationId The conversation ID for context
+ * @returns AI-generated response to the voice message
+ */
+export async function processVoiceMessage(audioBuffer: Buffer, conversationId: string): Promise<string> {
+  try {
+    // Create a temporary file path
+    const tempFilePath = path.join(os.tmpdir(), `voice-${Date.now()}.ogg`);
+    
+    // Write the buffer to a temporary file
+    fs.writeFileSync(tempFilePath, audioBuffer);
+    
+    try {
+      // Create a readable stream from the file
+      const audioReadStream = fs.createReadStream(tempFilePath);
+      
+      // Use the Whisper model to transcribe the audio
+      const transcription = await openai.audio.transcriptions.create({
+        file: audioReadStream,
+        model: "whisper-1",
+      });
+      
+      // Get the transcribed text
+      const transcribedText = transcription.text;
+      
+      // Save the user's message to conversation history
+      await storage.saveAIMessage({
+        user_id: 0,
+        content: transcribedText,
+        role: "user",
+        conversation_id: conversationId
+      });
+      
+      // Now process the transcribed text using our normal AI response generation
+      const response = await generateAIResponse(transcribedText, conversationId);
+      
+      return response;
+    } finally {
+      // Clean up the temporary file
+      if (fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+      }
+    }
+  } catch (error) {
+    console.error("Error processing voice message:", error);
+    throw error;
   }
 }
 

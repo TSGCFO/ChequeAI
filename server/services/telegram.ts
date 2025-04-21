@@ -1,5 +1,5 @@
 import TelegramBot from "node-telegram-bot-api";
-import { generateAIResponse } from "./openai";
+import { generateAIResponse, processVoiceMessage } from "./openai";
 
 // Telegram bot token from environment variables
 const telegramToken = process.env.TELEGRAM_BOT_TOKEN || "";
@@ -63,21 +63,54 @@ function setupBot() {
 
   // Handle all other text messages, including other commands
   bot.on("message", async (msg) => {
-    // Skip non-text messages
-    if (!msg.text) return;
+    const chatId = msg.chat.id;
     
     // Skip start and help commands (they have specific handlers)
     if (msg.text === "/start" || msg.text === "/help") return;
-    
-    const chatId = msg.chat.id;
     
     try {
       // Show typing indicator
       bot.sendChatAction(chatId, "typing");
       
-      // Generate response using OpenAI
       const conversationId = `telegram-${chatId}`;
-      const response = await generateAIResponse(msg.text, conversationId);
+      let response: string;
+      
+      // Handle text messages
+      if (msg.text) {
+        // Generate response using OpenAI
+        response = await generateAIResponse(msg.text, conversationId);
+      }
+      // Handle voice messages
+      else if (msg.voice) {
+        // Notify user that we're processing their voice message
+        await bot.sendMessage(chatId, "Processing your voice message...");
+        
+        try {
+          // Get the file info
+          const fileInfo = await bot.getFile(msg.voice.file_id);
+          
+          // Get the file path from Telegram servers
+          const fileUrl = `https://api.telegram.org/file/bot${telegramToken}/${fileInfo.file_path}`;
+          
+          // Download the voice message
+          const audioResponse = await fetch(fileUrl);
+          if (!audioResponse.ok) {
+            throw new Error(`Failed to download voice file: ${audioResponse.statusText}`);
+          }
+          
+          // Convert to buffer
+          const audioBuffer = await audioResponse.arrayBuffer();
+          
+          // Process the voice message
+          response = await processVoiceMessage(Buffer.from(audioBuffer), conversationId);
+        } catch (voiceError) {
+          console.error("Error processing voice message:", voiceError);
+          response = "Sorry, I had trouble processing your voice message. Could you please try sending it as text instead?";
+        }
+      } else {
+        // For other types of messages (photos, documents, etc.)
+        response = "I can only understand text and voice messages. Please send your query as text or voice.";
+      }
       
       // Send response
       bot.sendMessage(chatId, response);
