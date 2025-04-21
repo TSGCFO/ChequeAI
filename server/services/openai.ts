@@ -13,6 +13,7 @@ I'm your AI assistant for Cheque Ledger Pro. I can help with the following comma
 
 Commands:
 - \`/new transaction\` - Create a new transaction (I'll ask for details)
+- \`/deposit\` - Create a new customer deposit (I'll ask for customer ID and amount)
 - \`/find transaction\` - Find transaction details (I'll ask for the ID)
 - \`/summary\` - Get a summary of business metrics
 - \`/help\` - Show this help message
