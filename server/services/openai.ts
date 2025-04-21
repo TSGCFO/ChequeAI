@@ -16,7 +16,9 @@ I'm your AI assistant for Cheque Ledger Pro. I can help with commands and natura
 
 You can use either slash commands or natural language:
 - \`/new transaction\` or "create a new transaction" 
+  * You can enter customer/vendor names or IDs during the creation process
 - \`/deposit\` or "make a new deposit"
+  * You can enter customer names or IDs during the deposit process
 - \`/find transaction\` or "find transaction details"
 - \`/modify transaction\` or "modify cheque number 00010572" or "change the amount of cheque 12345"
 - \`/summary\` or "show me a business summary" 
@@ -907,7 +909,7 @@ async function handleDepositCommand(
   // Initialize state if not exists
   if (!state.step) {
     return {
-      response: "Let's create a new customer deposit. Please provide the customer ID (or type /cancel to cancel):",
+      response: "Let's create a new customer deposit. Please provide the customer name or ID (or type /cancel to cancel):",
       updatedState: {
         ...state,
         currentCommand: "/deposit",
@@ -932,20 +934,20 @@ async function handleDepositCommand(
   // Process based on current step
   switch (state.step) {
     case "askCustomerId":
-      const customerId = parseInt(userMessage.trim());
-      if (isNaN(customerId)) {
-        return {
-          response: "Customer ID must be a number. Please try again:",
-          updatedState: state
-        };
-      }
-
-      // Verify customer exists
+      // Try to find customer by name or ID
       try {
-        const customer = await storage.getCustomer(customerId);
+        const customerInput = userMessage.trim();
+        if (!customerInput) {
+          return {
+            response: "Please provide a customer name or ID:",
+            updatedState: state
+          };
+        }
+        
+        const customer = await findCustomerByNameOrId(customerInput);
         if (!customer) {
           return {
-            response: "Customer not found. Please provide a valid customer ID:",
+            response: "Customer not found. Please provide a valid customer name or ID:",
             updatedState: state
           };
         }
@@ -954,14 +956,14 @@ async function handleDepositCommand(
           response: `Customer: ${customer.customer_name}. Now, please provide the deposit amount:`,
           updatedState: {
             ...state,
-            pendingData: { ...state.pendingData, customerId },
+            pendingData: { ...state.pendingData, customerId: customer.customer_id },
             step: "askAmount"
           }
         };
       } catch (error) {
-        console.error("Error verifying customer:", error);
+        console.error("Error finding customer:", error);
         return {
-          response: "Error verifying customer. Please try again:",
+          response: "Error finding customer. Please try again with a valid customer name or ID:",
           updatedState: state
         };
       }
@@ -1013,7 +1015,7 @@ The deposit has been added to the database.`,
 
     default:
       return {
-        response: "Something went wrong with the deposit creation process. Let's start over. Please provide the customer ID:",
+        response: "Something went wrong with the deposit creation process. Let's start over. Please provide the customer name or ID:",
         updatedState: {
           ...state,
           step: "askCustomerId",
@@ -1319,7 +1321,7 @@ After confirming, I can help you create a new transaction with this cheque.`;
       step: "askCustomerId"
     };
     
-    const response = "Let's create a new transaction. Please provide the customer ID (or type /cancel to cancel):";
+    const response = "Let's create a new transaction. Please provide the customer name or ID (or type /cancel to cancel):";
     
     // Save assistant message to conversation history
     await storage.saveAIMessage({
@@ -1339,7 +1341,7 @@ After confirming, I can help you create a new transaction with this cheque.`;
       step: "askCustomerId"
     };
     
-    const response = "Let's create a new customer deposit. Please provide the customer ID (or type /cancel to cancel):";
+    const response = "Let's create a new customer deposit. Please provide the customer name or ID (or type /cancel to cancel):";
     
     // Save assistant message to conversation history
     await storage.saveAIMessage({
@@ -1469,7 +1471,7 @@ Remember, you can only modify the date, cheque number, amount, and vendor ID.`;
       step: "askCustomerId"
     };
     
-    const response = "Let's create a new transaction. Please provide the customer ID (or type /cancel to cancel):";
+    const response = "Let's create a new transaction. Please provide the customer name or ID (or type /cancel to cancel):";
     
     // Save assistant message to conversation history
     await storage.saveAIMessage({
@@ -1493,7 +1495,7 @@ Remember, you can only modify the date, cheque number, amount, and vendor ID.`;
       step: "askCustomerId"
     };
     
-    const response = "Let's create a new customer deposit. Please provide the customer ID (or type /cancel to cancel):";
+    const response = "Let's create a new customer deposit. Please provide the customer name or ID (or type /cancel to cancel):";
     
     // Save assistant message to conversation history
     await storage.saveAIMessage({
