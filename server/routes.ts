@@ -168,18 +168,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vendorId = req.query.vendorId as string | undefined;
       const status = req.query.status as string | undefined;
       
-      // Try direct database connection first
       try {
-        const { getTransactions } = await import('./direct-db');
-        const transactions = await getTransactions();
-        // Note: Direct connection doesn't support filtering yet
-        res.json(transactions);
-        return;
-      } catch (directError) {
-        console.error("Direct DB error:", directError);
-        // Fall back to storage interface
+        // Get all transactions with customer and vendor details
         const transactions = await storage.getTransactions({ limit, offset, customerId, vendorId, status });
-        res.json(transactions);
+        
+        // Also fetch customer and vendor data and enrich transactions
+        const customers = await storage.getCustomers();
+        const vendors = await storage.getVendors();
+        
+        // Prepare lookup tables for customers and vendors
+        const customerMap = new Map(customers.map(c => [c.customer_id, c]));
+        const vendorMap = new Map(vendors.map(v => [v.vendor_id, v]));
+        
+        // Enrich transactions with detailed customer and vendor data
+        const enrichedTransactions = transactions.map(transaction => {
+          return {
+            ...transaction,
+            customer: customerMap.get(transaction.customer_id) || { customer_name: "Unknown" },
+            vendor: vendorMap.get(transaction.vendor_id) || { vendor_name: "Unknown" }
+          };
+        });
+        
+        res.json(enrichedTransactions);
+      } catch (error) {
+        console.error("Error in transaction processing:", error);
+        res.status(500).json({ message: "Failed to get transactions" });
       }
     } catch (error) {
       console.error("Error getting transactions:", error);
