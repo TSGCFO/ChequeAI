@@ -164,13 +164,12 @@ async function handleNewTransactionCommand(
 
         // Create the transaction
         try {
+          // Only include the specified fields as requested
           const newTransaction: InsertTransaction = {
             customer_id: state.pendingData!.customerId!,
             cheque_number: state.pendingData!.chequeNumber!,
             cheque_amount: state.pendingData!.amount!,
-            vendor_id: vendorId,
-            date: new Date().toISOString(),
-            status: "pending"
+            vendor_id: vendorId
           };
 
           const transaction = await storage.createTransaction(newTransaction);
@@ -184,8 +183,8 @@ async function handleNewTransactionCommand(
   "transaction_id": ${transaction.transaction_id},
   "chequeNumber": "${transaction.cheque_number}",
   "chequeAmount": "${transaction.cheque_amount}",
-  "date": "${transaction.date ? new Date(transaction.date.toString()).toLocaleDateString() : 'N/A'}",
-  "status": "${transaction.status || 'pending'}"
+  "customer_id": ${transaction.customer_id},
+  "vendor_id": "${transaction.vendor_id}"
 }
 \`\`\`
 
