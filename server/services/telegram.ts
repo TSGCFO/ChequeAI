@@ -28,7 +28,7 @@ function setupBot() {
     const chatId = msg.chat.id;
     bot.sendMessage(
       chatId,
-      "Welcome to Cheque Ledger Pro! I'm your AI assistant. You can ask me about your transactions, customers, vendors, and more.\n\nType /help to see available commands."
+      "Welcome to Cheque Ledger Pro! I'm your AI assistant. You can ask me about your transactions, customers, vendors, and more.\n\nYou can use both slash commands like \"/modify transaction\" or natural language like \"modify the amount of cheque 12345\".\n\nType /help to see all available commands and examples."
     );
   });
   
@@ -37,25 +37,37 @@ function setupBot() {
     const chatId = msg.chat.id;
     bot.sendMessage(
       chatId,
+      "I'm your AI assistant for Cheque Ledger Pro. You can use both slash commands and natural language.\n\n" +
       "Available commands:\n" +
       "/start - Start the bot\n" +
       "/help - Show this help message\n" +
-      "/summary - Get a business summary\n" +
-      "/transactions - Get recent transactions\n\n" +
-      "You can also ask questions in natural language like:\n" +
-      "- \"Show me transactions for Atlas Construction\"\n" +
-      "- \"What's my profit this month?\"\n" +
-      "- \"Calculate fee for a $5000 cheque with Atlas Construction\""
+      "/new transaction - Create a new transaction\n" +
+      "/deposit - Create a new customer deposit\n" +
+      "/modify transaction - Modify an existing transaction\n" +
+      "/find transaction - Find transaction details\n" +
+      "/summary - Get a business summary\n\n" +
+      "You can also use natural language like:\n" +
+      "- \"create a new transaction\"\n" +
+      "- \"make a new deposit\"\n" +
+      "- \"modify cheque number 00010572\"\n" +
+      "- \"change the amount of cheque 12345\"\n" +
+      "- \"what's my business summary?\"\n\n" +
+      "For general questions, just ask about transactions, customers, vendors, or business metrics."
     );
   });
   
-  // Handle all text messages (excluding commands)
+  // Special handlers for specific commands
+  bot.onText(/^\/(start|help)$/, (msg) => {
+    // Don't do anything here, as these commands are handled by specific handlers above
+  });
+
+  // Handle all other text messages, including other commands
   bot.on("message", async (msg) => {
-    // Skip command messages
-    if (msg.text && msg.text.startsWith("/")) return;
-    
     // Skip non-text messages
     if (!msg.text) return;
+    
+    // Skip start and help commands (they have specific handlers)
+    if (msg.text === "/start" || msg.text === "/help") return;
     
     const chatId = msg.chat.id;
     
