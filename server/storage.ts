@@ -8,7 +8,9 @@ import {
   type BusinessSummary,
   type TransactionWithDetails,
   type AIMessage,
-  type InsertAIMessage
+  type InsertAIMessage,
+  type CustomerDeposit,
+  type InsertCustomerDeposit
 } from "@shared/schema";
 
 export interface IStorage {
@@ -39,6 +41,9 @@ export interface IStorage {
   createVendor(vendor: InsertVendor): Promise<Vendor>;
   updateVendor(id: string, vendor: Partial<InsertVendor>): Promise<Vendor | undefined>;
   deleteVendor(id: string): Promise<boolean>;
+  
+  // Customer Deposits methods
+  createCustomerDeposit(deposit: InsertCustomerDeposit): Promise<CustomerDeposit>;
   
   // Business summary
   getBusinessSummary(): Promise<BusinessSummary>;
