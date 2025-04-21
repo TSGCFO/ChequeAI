@@ -165,6 +165,18 @@ export default function Reports() {
     });
   };
 
+  // Function to get profit value from any possible API response format
+  const getProfitValue = (item: any) => {
+    return parseFloat(
+      item.total_profit || 
+      item.profit || 
+      item.total_potential_profit ||
+      item.total_realized_profit || 
+      item.unrealized_profit || 
+      "0"
+    );
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="mb-6 flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
@@ -309,28 +321,12 @@ export default function Reports() {
                         <Table>
                           <TableBody>
                             {profitByCustomer
-                              .sort((a, b) => {
-                                // Use the appropriate profit field based on what's available
-                                const getProfitValue = (item: any) => 
-                                  parseFloat(item.total_profit || 
-                                    item.profit || 
-                                    item.total_realized_profit ||
-                                    item.unrealized_profit || 
-                                    "0");
-                                return getProfitValue(b) - getProfitValue(a);
-                              })
+                              .sort((a, b) => getProfitValue(b) - getProfitValue(a))
                               .slice(0, 5)
                               .map((item: any) => (
                                 <TableRow key={item.customer_id}>
                                   <TableCell>{item.customer_name}</TableCell>
-                                  <TableCell>${parseFloat(
-                                    item.total_profit || 
-                                    item.profit || 
-                                    item.total_potential_profit ||
-                                    item.total_realized_profit || 
-                                    item.unrealized_profit || 
-                                    "0"
-                                  ).toFixed(2)}</TableCell>
+                                  <TableCell>${getProfitValue(item).toFixed(2)}</TableCell>
                                 </TableRow>
                             ))}
                           </TableBody>
@@ -352,27 +348,12 @@ export default function Reports() {
                         <Table>
                           <TableBody>
                             {profitByVendor
-                              .sort((a, b) => {
-                                // Use the appropriate profit field based on what's available
-                                const getProfitValue = (item: any) => 
-                                  parseFloat(item.total_profit || 
-                                    item.profit || 
-                                    item.total_realized_profit ||
-                                    item.unrealized_profit || 
-                                    "0");
-                                return getProfitValue(b) - getProfitValue(a);
-                              })
+                              .sort((a, b) => getProfitValue(b) - getProfitValue(a))
                               .slice(0, 5)
                               .map((item: any) => (
                                 <TableRow key={item.vendor_id}>
                                   <TableCell>{item.vendor_name}</TableCell>
-                                  <TableCell>${parseFloat(
-                                    item.total_profit || 
-                                    item.profit || 
-                                    item.total_realized_profit || 
-                                    item.unrealized_profit || 
-                                    "0"
-                                  ).toFixed(2)}</TableCell>
+                                  <TableCell>${getProfitValue(item).toFixed(2)}</TableCell>
                                 </TableRow>
                             ))}
                           </TableBody>
@@ -455,13 +436,7 @@ export default function Reports() {
                           <TableRow key={item.customer_id}>
                             <TableCell className="font-medium">{item.customer_name}</TableCell>
                             <TableCell>{item.transaction_count}</TableCell>
-                            <TableCell>${parseFloat(
-                              item.total_profit || 
-                              item.profit || 
-                              item.total_realized_profit || 
-                              item.unrealized_profit || 
-                              "0"
-                            ).toFixed(2)}</TableCell>
+                            <TableCell>${getProfitValue(item).toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -542,13 +517,7 @@ export default function Reports() {
                           <TableRow key={item.vendor_id}>
                             <TableCell className="font-medium">{item.vendor_name}</TableCell>
                             <TableCell>{item.transaction_count}</TableCell>
-                            <TableCell>${parseFloat(
-                              item.total_profit || 
-                              item.profit || 
-                              item.total_realized_profit || 
-                              item.unrealized_profit || 
-                              "0"
-                            ).toFixed(2)}</TableCell>
+                            <TableCell>${getProfitValue(item).toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
