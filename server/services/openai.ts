@@ -314,7 +314,7 @@ async function handleModifyTransactionCommand(
   // Initialize state if not exists
   if (!state.step) {
     return {
-      response: "Let's modify a transaction. Please provide the transaction ID (or type /cancel to cancel):",
+      response: "Let's modify a transaction. Please provide the transaction ID or cheque number (or type /cancel to cancel):",
       updatedState: {
         ...state,
         currentCommand: "/modify transaction",
@@ -339,28 +339,48 @@ async function handleModifyTransactionCommand(
   // Process based on current step
   switch (state.step) {
     case "askTransactionId":
-      const transactionId = parseInt(userMessage.trim());
-      if (isNaN(transactionId)) {
+      const userInput = userMessage.trim();
+      let transaction = null;
+      let transactionId = null;
+      
+      // First, check if input might be a cheque number
+      if (userInput.match(/^[a-zA-Z0-9]+$/)) {
+        try {
+          // Try to find by cheque number
+          const transactions = await storage.getTransactions();
+          const matchedTransaction = transactions.find(t => t.cheque_number === userInput);
+          
+          if (matchedTransaction) {
+            transactionId = matchedTransaction.transaction_id;
+            transaction = await storage.getTransactionWithDetails(transactionId);
+          }
+        } catch (error) {
+          console.error("Error searching for transaction by cheque number:", error);
+        }
+      }
+      
+      // If not found by cheque number, try as transaction ID
+      if (!transaction && !isNaN(parseInt(userInput))) {
+        transactionId = parseInt(userInput);
+        try {
+          transaction = await storage.getTransactionWithDetails(transactionId);
+        } catch (error) {
+          console.error("Error getting transaction by ID:", error);
+        }
+      }
+      
+      // If still not found, return error
+      if (!transaction) {
         return {
-          response: "Transaction ID must be a number. Please try again or type /cancel to cancel:",
+          response: "Transaction not found. Please provide a valid transaction ID or cheque number:",
           updatedState: state
         };
       }
 
-      // Verify transaction exists
-      try {
-        const transaction = await storage.getTransactionWithDetails(transactionId);
-        if (!transaction) {
-          return {
-            response: "Transaction not found. Please provide a valid transaction ID:",
-            updatedState: state
-          };
-        }
-
-        // Store transaction and display details
-        return {
-          response: `Found transaction #${transaction.transaction_id}:
-          
+      // Store transaction and display details
+      return {
+        response: `Found transaction #${transaction.transaction_id}:
+        
 Cheque Number: ${transaction.cheque_number}
 Cheque Amount: $${transaction.cheque_amount}
 Date: ${transaction.date ? new Date(transaction.date.toString()).toLocaleDateString() : 'Not set'}
@@ -374,23 +394,16 @@ What would you like to modify? (Type the number):
 4. Vendor ID
 
 Remember, you can only modify the date, cheque number, amount, and vendor ID.`,
-          updatedState: {
-            ...state,
-            pendingData: { 
-              ...state.pendingData, 
-              transactionId,
-              originalTransaction: transaction 
-            },
-            step: "askFieldToModify"
-          }
-        };
-      } catch (error) {
-        console.error("Error getting transaction:", error);
-        return {
-          response: "Error retrieving transaction. Please try again:",
-          updatedState: state
-        };
-      }
+        updatedState: {
+          ...state,
+          pendingData: { 
+            ...state.pendingData, 
+            transactionId,
+            originalTransaction: transaction 
+          },
+          step: "askFieldToModify"
+        }
+      };
 
     case "askFieldToModify":
       const option = userMessage.trim();
@@ -425,7 +438,7 @@ Remember, you can only modify the date, cheque number, amount, and vendor ID.`,
           promptMessage = "Please enter the new amount (e.g., 1000.50):";
           break;
         case "vendor_id":
-          promptMessage = "Please enter the new vendor ID:";
+          promptMessage = "Please enter the new vendor name or ID:";
           break;
         default:
           promptMessage = "Please enter the new value:";
@@ -508,8 +521,20 @@ Remember, you can only modify the date, cheque number, amount, and vendor ID.`,
         oldValueDisplay = originalTransaction.cheque_number;
         newValueDisplay = newValue;
       } else if (fieldToModify === "vendor_id") {
-        oldValueDisplay = originalTransaction.vendor_id;
-        newValueDisplay = newValue;
+        // Try to get the vendor name for better display
+        const oldVendorName = originalTransaction.vendor?.vendor_name || originalTransaction.vendor_id;
+        // For new value, find the vendor name if possible
+        let newVendorName = newValue;
+        try {
+          const newVendor = await storage.getVendor(newValue);
+          if (newVendor) {
+            newVendorName = newVendor.vendor_name;
+          }
+        } catch (error) {
+          console.error("Error getting vendor name for display:", error);
+        }
+        oldValueDisplay = oldVendorName;
+        newValueDisplay = newVendorName;
       } else {
         oldValueDisplay = 'Unknown';
         newValueDisplay = newValue;
@@ -519,7 +544,7 @@ Remember, you can only modify the date, cheque number, amount, and vendor ID.`,
         date: "Date",
         cheque_number: "Cheque Number",
         cheque_amount: "Cheque Amount",
-        vendor_id: "Vendor ID"
+        vendor_id: "Vendor"
       }[fieldToModify];
 
       return {
@@ -612,7 +637,7 @@ The changes have been saved to the database.`,
 
     default:
       return {
-        response: "Something went wrong with the transaction modification process. Let's start over. Please provide the transaction ID:",
+        response: "Something went wrong with the transaction modification process. Let's start over. Please provide the transaction ID or cheque number:",
         updatedState: {
           ...state,
           step: "askTransactionId",
