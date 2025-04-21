@@ -61,6 +61,21 @@ export default function ChatInterface({ onClose }: ChatInterfaceProps) {
     scrollToBottom();
   }, [messages]);
   
+  // Check for recently processed documents when component mounts
+  useEffect(() => {
+    const lastProcessedDocument = window.localStorage.getItem('lastProcessedDocument');
+    if (lastProcessedDocument === 'true') {
+      // Clear the flag
+      window.localStorage.removeItem('lastProcessedDocument');
+      
+      // The conversation ID is already loaded since we're using it from localStorage
+      toast({
+        title: "Document processed",
+        description: "Your document has been processed. The AI assistant will help you complete the transaction.",
+      });
+    }
+  }, [toast]);
+  
   // Load conversation history when component mounts
   useEffect(() => {
     const fetchConversationHistory = async () => {
