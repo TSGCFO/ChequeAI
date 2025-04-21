@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { storage } from "../storage";
-import { InsertTransaction } from "@shared/schema";
+import { InsertTransaction, TransactionWithDetails } from "@shared/schema";
 
 // Initialize OpenAI with the API key from environment variables
 const openai = new OpenAI({ 
@@ -15,6 +15,7 @@ Commands:
 - \`/new transaction\` - Create a new transaction (I'll ask for details)
 - \`/deposit\` - Create a new customer deposit (I'll ask for customer ID and amount)
 - \`/find transaction\` - Find transaction details (I'll ask for the ID)
+- \`/modify transaction\` - Modify an existing transaction (date, cheque number, amount, or vendor)
 - \`/summary\` - Get a summary of business metrics
 - \`/help\` - Show this help message
 
@@ -137,7 +138,8 @@ async function handleNewTransactionCommand(
       };
 
     case "askAmount":
-      const amount = userMessage.trim().replace('$', '');
+      // Properly handle formats like $73,687.30 or 73,687.30
+      const amount = userMessage.trim().replace('$', '').replace(/,/g, '');
       const amountNumber = parseFloat(amount);
       
       if (isNaN(amountNumber) || amountNumber <= 0) {
@@ -234,6 +236,311 @@ The transaction has been added to the database. You can view it in the transacti
         updatedState: {
           ...state,
           step: "askCustomerId",
+          pendingData: {}
+        }
+      };
+  }
+}
+
+/**
+ * Handle the /modify transaction command
+ * @param userMessage User's message
+ * @param conversationId Conversation ID
+ * @param state Current conversation state
+ * @returns Response message and updated state
+ */
+async function handleModifyTransactionCommand(
+  userMessage: string, 
+  conversationId: string, 
+  state: ConversationState[string]
+): Promise<{ response: string; updatedState: ConversationState[string] }> {
+  // Initialize state if not exists
+  if (!state.step) {
+    return {
+      response: "Let's modify a transaction. Please provide the transaction ID (or type /cancel to cancel):",
+      updatedState: {
+        ...state,
+        currentCommand: "/modify transaction",
+        pendingData: {},
+        step: "askTransactionId"
+      }
+    };
+  }
+  
+  // Check for cancel command
+  if (userMessage.trim().toLowerCase() === "/cancel") {
+    return {
+      response: "Transaction modification cancelled. How can I help you?",
+      updatedState: {
+        currentCommand: undefined,
+        pendingData: undefined,
+        step: undefined
+      }
+    };
+  }
+
+  // Process based on current step
+  switch (state.step) {
+    case "askTransactionId":
+      const transactionId = parseInt(userMessage.trim());
+      if (isNaN(transactionId)) {
+        return {
+          response: "Transaction ID must be a number. Please try again or type /cancel to cancel:",
+          updatedState: state
+        };
+      }
+
+      // Verify transaction exists
+      try {
+        const transaction = await storage.getTransactionWithDetails(transactionId);
+        if (!transaction) {
+          return {
+            response: "Transaction not found. Please provide a valid transaction ID:",
+            updatedState: state
+          };
+        }
+
+        // Store transaction and display details
+        return {
+          response: `Found transaction #${transaction.transaction_id}:
+          
+Cheque Number: ${transaction.cheque_number}
+Cheque Amount: $${transaction.cheque_amount}
+Date: ${transaction.date ? new Date(transaction.date.toString()).toLocaleDateString() : 'Not set'}
+Customer: ${transaction.customer?.customer_name || 'Unknown'}
+Vendor: ${transaction.vendor?.vendor_name || 'Unknown'}
+
+What would you like to modify? (Type the number):
+1. Date
+2. Cheque Number
+3. Cheque Amount
+4. Vendor ID
+
+Remember, you can only modify the date, cheque number, amount, and vendor ID.`,
+          updatedState: {
+            ...state,
+            pendingData: { 
+              ...state.pendingData, 
+              transactionId,
+              originalTransaction: transaction 
+            },
+            step: "askFieldToModify"
+          }
+        };
+      } catch (error) {
+        console.error("Error getting transaction:", error);
+        return {
+          response: "Error retrieving transaction. Please try again:",
+          updatedState: state
+        };
+      }
+
+    case "askFieldToModify":
+      const option = userMessage.trim();
+      let selectedField: string;
+
+      // Determine which field to modify based on user's selection
+      if (option === "1" || option.toLowerCase() === "date") {
+        selectedField = "date";
+      } else if (option === "2" || option.toLowerCase() === "cheque number") {
+        selectedField = "cheque_number";
+      } else if (option === "3" || option.toLowerCase() === "cheque amount") {
+        selectedField = "cheque_amount";
+      } else if (option === "4" || option.toLowerCase() === "vendor id") {
+        selectedField = "vendor_id";
+      } else {
+        return {
+          response: "Invalid selection. Please enter a number from 1-4 or the field name:",
+          updatedState: state
+        };
+      }
+
+      // Ask for the new value based on selected field
+      let promptMessage: string;
+      switch (fieldToModify) {
+        case "date":
+          promptMessage = "Please enter the new date (YYYY-MM-DD):";
+          break;
+        case "cheque_number":
+          promptMessage = "Please enter the new cheque number:";
+          break;
+        case "cheque_amount":
+          promptMessage = "Please enter the new amount (e.g., 1000.50):";
+          break;
+        case "vendor_id":
+          promptMessage = "Please enter the new vendor ID:";
+          break;
+        default:
+          promptMessage = "Please enter the new value:";
+      }
+
+      return {
+        response: promptMessage,
+        updatedState: {
+          ...state,
+          pendingData: { ...state.pendingData, fieldToModify },
+          step: "askNewValue"
+        }
+      };
+
+    case "askNewValue":
+      const fieldToModify = state.pendingData?.fieldToModify as string;
+      let newValue = userMessage.trim();
+      const originalTransaction = state.pendingData?.originalTransaction as TransactionWithDetails;
+      
+      // Process the new value based on the field type
+      if (fieldToModify === "cheque_amount") {
+        // Remove $ and commas for amount values
+        newValue = newValue.replace(/[$,]/g, '');
+        const amountNumber = parseFloat(newValue);
+        
+        if (isNaN(amountNumber) || amountNumber <= 0) {
+          return {
+            response: "Please enter a valid positive number for the amount:",
+            updatedState: state
+          };
+        }
+        
+        newValue = amountNumber.toString();
+      } else if (fieldToModify === "vendor_id") {
+        // Verify vendor exists
+        try {
+          const vendor = await storage.getVendor(newValue);
+          if (!vendor) {
+            return {
+              response: "Vendor not found. Please provide a valid vendor ID:",
+              updatedState: state
+            };
+          }
+        } catch (error) {
+          console.error("Error verifying vendor:", error);
+          return {
+            response: "Error verifying vendor. Please try again with a valid vendor ID:",
+            updatedState: state
+          };
+        }
+      }
+
+      // Prepare update data (only include allowed fields)
+      const updateData: Partial<InsertTransaction> = {};
+      updateData[fieldToModify] = newValue;
+
+      // Show confirmation with clear before/after information
+      let oldValueDisplay: string;
+      let newValueDisplay: string;
+      
+      if (fieldToModify === "cheque_amount") {
+        oldValueDisplay = `$${originalTransaction.cheque_amount}`;
+        newValueDisplay = `$${newValue}`;
+      } else if (fieldToModify === "date") {
+        oldValueDisplay = originalTransaction.date ? new Date(originalTransaction.date.toString()).toLocaleDateString() : 'Not set';
+        newValueDisplay = newValue;
+      } else {
+        oldValueDisplay = originalTransaction[fieldToModify] || 'Not set';
+        newValueDisplay = newValue;
+      }
+
+      const fieldDisplayName = {
+        date: "Date",
+        cheque_number: "Cheque Number",
+        cheque_amount: "Cheque Amount",
+        vendor_id: "Vendor ID"
+      }[fieldToModify];
+
+      return {
+        response: `Please confirm the following change to Transaction #${originalTransaction.transaction_id}:
+
+Change ${fieldDisplayName} from: ${oldValueDisplay}
+To: ${newValueDisplay}
+
+Type "confirm" to proceed or "cancel" to abort.`,
+        updatedState: {
+          ...state,
+          pendingData: { 
+            ...state.pendingData, 
+            updateData 
+          },
+          step: "confirmUpdate"
+        }
+      };
+
+    case "confirmUpdate":
+      const confirmation = userMessage.trim().toLowerCase();
+      
+      if (confirmation === "confirm" || confirmation === "yes") {
+        const transactionId = state.pendingData?.transactionId as number;
+        const updateData = state.pendingData?.updateData as Partial<InsertTransaction>;
+        
+        try {
+          // Make the update (only using the allowed fields)
+          const updatedTransaction = await storage.updateTransaction(transactionId, updateData);
+          
+          if (!updatedTransaction) {
+            return {
+              response: "Error updating the transaction. The transaction may no longer exist.",
+              updatedState: {
+                currentCommand: undefined,
+                pendingData: undefined,
+                step: undefined
+              }
+            };
+          }
+          
+          // Format response with updated transaction details
+          return {
+            response: `Transaction #${updatedTransaction.transaction_id} has been successfully updated!
+
+\`\`\`json
+{
+  "transaction_id": ${updatedTransaction.transaction_id},
+  "chequeNumber": "${updatedTransaction.cheque_number}",
+  "chequeAmount": "${updatedTransaction.cheque_amount}",
+  "date": "${updatedTransaction.date ? new Date(updatedTransaction.date.toString()).toLocaleDateString() : 'N/A'}",
+  "customer_id": ${updatedTransaction.customer_id},
+  "vendor_id": "${updatedTransaction.vendor_id}"
+}
+\`\`\`
+
+The changes have been saved to the database.`,
+            updatedState: {
+              currentCommand: undefined,
+              pendingData: undefined,
+              step: undefined
+            }
+          };
+        } catch (error) {
+          console.error("Error updating transaction:", error);
+          return {
+            response: "Error updating the transaction. Please try again later.",
+            updatedState: {
+              currentCommand: undefined,
+              pendingData: undefined,
+              step: undefined
+            }
+          };
+        }
+      } else if (confirmation === "cancel" || confirmation === "no") {
+        return {
+          response: "Transaction update cancelled. How can I help you?",
+          updatedState: {
+            currentCommand: undefined,
+            pendingData: undefined,
+            step: undefined
+          }
+        };
+      } else {
+        return {
+          response: `Please type "confirm" to update the transaction or "cancel" to abort.`,
+          updatedState: state
+        };
+      }
+
+    default:
+      return {
+        response: "Something went wrong with the transaction modification process. Let's start over. Please provide the transaction ID:",
+        updatedState: {
+          ...state,
+          step: "askTransactionId",
           pendingData: {}
         }
       };
@@ -398,6 +705,12 @@ async function handleCommands(userMessage: string, conversationId: string): Prom
         const depositResult = await handleDepositCommand(userMessage, conversationId, state);
         response = depositResult.response;
         updatedState = depositResult.updatedState;
+        break;
+        
+      case "/modify transaction":
+        const modifyResult = await handleModifyTransactionCommand(userMessage, conversationId, state);
+        response = modifyResult.response;
+        updatedState = modifyResult.updatedState;
         break;
         
       // Add other command handlers here
