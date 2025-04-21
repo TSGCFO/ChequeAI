@@ -39,8 +39,7 @@ export const chequeTransactions = pgTable("cheque_transactions", {
   received_from_vendor: numeric("received_from_vendor", { precision: 10, scale: 2 }).default("0"),
   profit_withdrawn: numeric("profit_withdrawn", { precision: 10, scale: 2 }).default("0"),
   created_at: timestamp("created_at").defaultNow(),
-  updated_at: timestamp("updated_at").defaultNow(),
-  status: text("status").default("pending")
+  updated_at: timestamp("updated_at").defaultNow()
 });
 
 // Customer deposits

@@ -184,7 +184,8 @@ async function handleNewTransactionCommand(
   "chequeNumber": "${transaction.cheque_number}",
   "chequeAmount": "${transaction.cheque_amount}",
   "customer_id": ${transaction.customer_id},
-  "vendor_id": "${transaction.vendor_id}"
+  "vendor_id": "${transaction.vendor_id}",
+  "date": "${transaction.date ? new Date(transaction.date.toString()).toLocaleDateString() : 'N/A'}"
 }
 \`\`\`
 

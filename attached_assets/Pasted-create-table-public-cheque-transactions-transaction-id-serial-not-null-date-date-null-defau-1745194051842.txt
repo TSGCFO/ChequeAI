@@ -1,0 +1,46 @@
+create table public.cheque_transactions (
+  transaction_id serial not null,
+  date date null default CURRENT_DATE,
+  customer_id integer not null,
+  cheque_number character varying(50) not null,
+  cheque_amount numeric(10, 2) not null,
+  customer_fee numeric(10, 2) null,
+  net_payable_to_customer numeric(10, 2) null,
+  vendor_id character varying(20) not null,
+  vendor_fee numeric(10, 2) null,
+  amount_to_receive_from_vendor numeric(10, 2) null,
+  profit numeric(10, 2) null,
+  paid_to_customer numeric(10, 2) null default 0,
+  received_from_vendor numeric(10, 2) null default 0,
+  profit_withdrawn numeric(10, 2) null default 0,
+  created_at timestamp without time zone null default CURRENT_TIMESTAMP,
+  updated_at timestamp without time zone null default CURRENT_TIMESTAMP,
+  constraint cheque_transactions_pkey primary key (transaction_id),
+  constraint cheque_transactions_cheque_number_key unique (cheque_number),
+  constraint cheque_transactions_customer_id_fkey foreign KEY (customer_id) references customers (customer_id),
+  constraint cheque_transactions_vendor_id_fkey foreign KEY (vendor_id) references vendors (vendor_id),
+  constraint cheque_transactions_cheque_amount_check check ((cheque_amount > (0)::numeric))
+) TABLESPACE pg_default;
+
+create index IF not exists idx_cheque_transactions_customer_id on public.cheque_transactions using btree (customer_id) TABLESPACE pg_default;
+
+create index IF not exists idx_cheque_transactions_vendor_id on public.cheque_transactions using btree (vendor_id) TABLESPACE pg_default;
+
+create index IF not exists idx_cheque_transactions_date on public.cheque_transactions using btree (date) TABLESPACE pg_default;
+
+create trigger calculate_transaction_fields_on_insert BEFORE INSERT on cheque_transactions for EACH row
+execute FUNCTION calculate_transaction_fields ();
+
+create trigger calculate_transaction_fields_on_update BEFORE
+update OF customer_id,
+cheque_amount,
+vendor_id on cheque_transactions for EACH row when (
+  old.customer_id is distinct from new.customer_id
+  or old.cheque_amount is distinct from new.cheque_amount
+  or old.vendor_id::text is distinct from new.vendor_id::text
+)
+execute FUNCTION calculate_transaction_fields ();
+
+create trigger update_transactions_modtime BEFORE
+update on cheque_transactions for EACH row
+execute FUNCTION update_modified_column ();
