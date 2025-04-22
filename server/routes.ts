@@ -8,6 +8,8 @@ import multer from "multer";
 import { processDocument } from "./services/documentProcessor";
 import { sendTelegramMessage } from "./services/telegram";
 import { generateAIResponse, processChequeDocument } from "./services/openai";
+import { setupAuth, requireAuth } from "./auth";
+import { registerUserRoutes } from "./user-routes";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -20,6 +22,12 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes prefix
   const apiRouter = "/api";
+
+  // Set up authentication
+  setupAuth(app);
+  
+  // Register user management routes
+  registerUserRoutes(app, apiRouter);
 
   // OpenAI client
   const openai = new OpenAI({
@@ -487,26 +495,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // AI Assistant endpoint
-  app.post(`${apiRouter}/ai-assistant`, async (req, res) => {
+  app.post(`${apiRouter}/ai-assistant`, requireAuth, async (req, res) => {
     try {
-      const { message, conversationId, userId } = req.body;
+      const { message, conversationId } = req.body;
       
       if (!message) {
         return res.status(400).json({ message: "No message provided" });
+      }
+
+      // Get the current user
+      const currentUser = req.user as User;
+      
+      // For database-stored conversations, verify ownership
+      if (conversationId && !conversationId.startsWith("session-")) {
+        try {
+          const convId = parseInt(conversationId);
+          const [userConversation] = await db
+            .select()
+            .from(userConversations)
+            .where(eq(userConversations.conversation_id, convId));
+            
+          if (userConversation && userConversation.user_id !== currentUser.user_id && 
+              !["superuser", "admin"].includes(currentUser.role)) {
+            return res.status(403).json({ message: "Not authorized to use this conversation" });
+          }
+        } catch (error) {
+          console.error("Error checking conversation ownership:", error);
+        }
+      }
+
+      // If no conversationId provided, create a new one
+      let finalConversationId = conversationId;
+      if (!finalConversationId) {
+        try {
+          // Create a new conversation for this user
+          const [newConversation] = await db
+            .insert(userConversations)
+            .values({
+              user_id: currentUser.user_id,
+              title: "New Conversation"
+            })
+            .returning();
+            
+          finalConversationId = newConversation.conversation_id.toString();
+        } catch (error) {
+          console.error("Error creating new conversation:", error);
+          // Fall back to session ID if database error
+          finalConversationId = `session-${Date.now()}`;
+        }
       }
 
       // Save user message
       await storage.saveAIMessage({
         content: message,
         role: 'user',
-        conversation_id: conversationId || 'default',
-        user_id: userId || 0
+        conversation_id: finalConversationId,
+        user_id: currentUser.user_id
       });
 
       // Generate AI response - this function now handles saving the assistant's response
-      const aiResponse = await generateAIResponse(message, conversationId || 'default');
+      const aiResponse = await generateAIResponse(message, finalConversationId);
 
-      res.json({ response: aiResponse });
+      res.json({ response: aiResponse, conversationId: finalConversationId });
     } catch (error) {
       console.error("Error generating AI response:", error);
       res.status(500).json({ message: "Failed to generate AI response" });
@@ -514,11 +564,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get conversation history
-  app.get(`${apiRouter}/ai-assistant/history/:conversationId`, async (req, res) => {
+  app.get(`${apiRouter}/ai-assistant/history/:conversationId`, requireAuth, async (req, res) => {
     try {
       const { conversationId } = req.params;
+      const currentUser = req.user as User;
+      
+      // For database-stored conversations, verify ownership
+      if (conversationId && !conversationId.startsWith("session-")) {
+        try {
+          const convId = parseInt(conversationId);
+          const [userConversation] = await db
+            .select()
+            .from(userConversations)
+            .where(eq(userConversations.conversation_id, convId));
+            
+          if (userConversation && userConversation.user_id !== currentUser.user_id && 
+              !["superuser", "admin"].includes(currentUser.role)) {
+            return res.status(403).json({ message: "Not authorized to view this conversation" });
+          }
+        } catch (error) {
+          console.error("Error checking conversation ownership:", error);
+        }
+      }
+      
+      // Get history
       const history = await storage.getAIConversationHistory(conversationId);
-      res.json(history);
+      
+      // Process so we only return 35 most recent messages (user request)
+      const recentHistory = history.slice(-35);
+      
+      res.json(recentHistory);
     } catch (error) {
       console.error("Error getting conversation history:", error);
       res.status(500).json({ message: "Failed to get conversation history" });

@@ -1890,9 +1890,28 @@ export async function generateAIResponse(userMessage: string, conversationId: st
     
     const assistantResponse = response.choices[0].message.content || "I'm sorry, I couldn't generate a response.";
     
+    // Get user ID from conversation if available
+    let userId = null;
+    try {
+      // Try to get user ID from conversation record for database-stored conversations
+      if (!conversationId.startsWith("session-")) {
+        const convId = parseInt(conversationId);
+        const [userConversation] = await db
+          .select()
+          .from(userConversations)
+          .where(eq(userConversations.conversation_id, convId));
+        
+        if (userConversation) {
+          userId = userConversation.user_id;
+        }
+      }
+    } catch (error) {
+      console.error("Error getting user ID from conversation:", error);
+    }
+    
     // Save assistant message to conversation history
     await storage.saveAIMessage({
-      user_id: 0,
+      user_id: userId,
       content: assistantResponse,
       role: "assistant",
       conversation_id: conversationId
@@ -1933,9 +1952,28 @@ export async function processVoiceMessage(audioBuffer: Buffer, conversationId: s
       // Get the transcribed text
       const transcribedText = transcription.text;
       
+      // Get user ID from conversation if available
+      let userId = null;
+      try {
+        // Try to get user ID from conversation record for database-stored conversations
+        if (!conversationId.startsWith("session-")) {
+          const convId = parseInt(conversationId);
+          const [userConversation] = await db
+            .select()
+            .from(userConversations)
+            .where(eq(userConversations.conversation_id, convId));
+          
+          if (userConversation) {
+            userId = userConversation.user_id;
+          }
+        }
+      } catch (error) {
+        console.error("Error getting user ID from conversation:", error);
+      }
+      
       // Save the user's message to conversation history
       await storage.saveAIMessage({
-        user_id: 0,
+        user_id: userId,
         content: transcribedText,
         role: "user",
         conversation_id: conversationId
@@ -1979,13 +2017,32 @@ export async function processChequeDocument(
       // Convert image to base64
       const base64Data = fileBuffer.toString('base64');
       
+      // Get user ID from conversation if available
+      let userId = null;
+      try {
+        // Try to get user ID from conversation record for database-stored conversations
+        if (!conversationId.startsWith("session-")) {
+          const convId = parseInt(conversationId);
+          const [userConversation] = await db
+            .select()
+            .from(userConversations)
+            .where(eq(userConversations.conversation_id, convId));
+          
+          if (userConversation) {
+            userId = userConversation.user_id;
+          }
+        }
+      } catch (error) {
+        console.error("Error getting user ID from conversation:", error);
+      }
+      
       // Save the document message to conversation history
       let userMessageContent = fileType === 'application/pdf' 
         ? "[User uploaded a PDF document with cheque(s)]" 
         : "[User uploaded an image of cheque(s)]";
       
       await storage.saveAIMessage({
-        user_id: 0,
+        user_id: userId,
         content: userMessageContent,
         role: "user",
         conversation_id: conversationId
