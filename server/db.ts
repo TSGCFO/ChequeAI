@@ -4,12 +4,12 @@ import * as schema from "@shared/schema";
 
 const { Pool } = pg;
 
-// Only use Supabase database
+// Use Supabase database
 const databaseUrl = process.env.SUPABASE_DATABASE_URL;
 
 if (!databaseUrl) {
   throw new Error(
-    "No Supabase database connection string available. Please set SUPABASE_DATABASE_URL.",
+    "SUPABASE_DATABASE_URL must be set. Please provide a valid Supabase connection string.",
   );
 }
 
@@ -17,7 +17,7 @@ console.log("Connecting to database using node-postgres...");
 export const pool = new Pool({ 
   connectionString: databaseUrl,
   ssl: {
-    rejectUnauthorized: false // This is only for development, not recommended for production
+    rejectUnauthorized: false // Required for Supabase connection
   }
 });
 

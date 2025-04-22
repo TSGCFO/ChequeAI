@@ -1,6 +1,33 @@
-import { pgTable, text, integer, numeric, date, boolean, timestamp, serial, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, numeric, date, boolean, timestamp, serial, varchar, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// User Role Enum
+export const userRoleEnum = pgEnum('user_role', ['superuser', 'admin', 'user']);
+
+// Users Table
+export const users = pgTable("users", {
+  user_id: serial("user_id").primaryKey(),
+  username: varchar("username", { length: 255 }).notNull().unique(),
+  password: varchar("password", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  role: userRoleEnum("role").notNull().default('user'),
+  first_name: varchar("first_name", { length: 255 }),
+  last_name: varchar("last_name", { length: 255 }),
+  is_active: boolean("is_active").default(true),
+  last_login: timestamp("last_login"),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow()
+});
+
+// User Conversations Table (to track conversation context per user)
+export const userConversations = pgTable("user_conversations", {
+  conversation_id: serial("conversation_id").primaryKey(),
+  user_id: integer("user_id").notNull().references(() => users.user_id),
+  title: varchar("title", { length: 255 }).default('New Conversation'),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow()
+});
 
 // Customers Table
 export const customers = pgTable("customers", {
@@ -121,7 +148,51 @@ export const insertAIMessageSchema = createInsertSchema(aiMessages).omit({
   created_at: true
 });
 
+// User schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  user_id: true,
+  created_at: true,
+  updated_at: true,
+  last_login: true
+}).extend({
+  // Add password confirmation for registration
+  confirmPassword: z.string()
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"]
+});
+
+export const loginUserSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required")
+});
+
+export const updateUserSchema = createInsertSchema(users).omit({
+  user_id: true,
+  created_at: true,
+  updated_at: true,
+  last_login: true,
+  password: true
+}).partial();
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string()
+}).refine(data => data.newPassword === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"]
+});
+
+export const insertUserConversationSchema = createInsertSchema(userConversations).omit({
+  conversation_id: true,
+  created_at: true,
+  updated_at: true
+});
+
 // Create select types
+export type User = typeof users.$inferSelect;
+export type UserConversation = typeof userConversations.$inferSelect;
 export type Customer = typeof customers.$inferSelect;
 export type Vendor = typeof vendors.$inferSelect;
 export type ChequeTransaction = typeof chequeTransactions.$inferSelect;
@@ -130,6 +201,11 @@ export type VendorPayment = typeof vendorPayments.$inferSelect;
 export type AIMessage = typeof aiMessages.$inferSelect;
 
 // Create insert types
+export type InsertUser = Omit<z.infer<typeof insertUserSchema>, 'confirmPassword'>;
+export type LoginUser = z.infer<typeof loginUserSchema>;
+export type UpdateUser = z.infer<typeof updateUserSchema>;
+export type ChangePassword = z.infer<typeof changePasswordSchema>;
+export type InsertUserConversation = z.infer<typeof insertUserConversationSchema>;
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
 export type InsertVendor = z.infer<typeof insertVendorSchema>;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
