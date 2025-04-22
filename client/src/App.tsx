@@ -13,6 +13,9 @@ import Settings from "@/pages/Settings";
 import EditTransaction from "@/pages/EditTransaction";
 import Layout from "@/components/Layout";
 import { useEffect } from "react";
+import { AuthProvider } from "@/hooks/use-auth";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import AuthPage from "@/pages/AuthPage";
 
 function Router() {
   useEffect(() => {
@@ -20,18 +23,17 @@ function Router() {
   }, []);
 
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/customers" component={Customers} />
-        <Route path="/vendors" component={Vendors} />
-        <Route path="/reports" component={Reports} />
-        <Route path="/documents" component={Documents} />
-        <Route path="/settings" component={Settings} />
-        <Route path="/edit-transaction/:id" component={EditTransaction} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      <ProtectedRoute path="/" component={Dashboard} />
+      <ProtectedRoute path="/customers" component={Customers} />
+      <ProtectedRoute path="/vendors" component={Vendors} />
+      <ProtectedRoute path="/reports" component={Reports} />
+      <ProtectedRoute path="/documents" component={Documents} />
+      <ProtectedRoute path="/settings" component={Settings} />
+      <ProtectedRoute path="/edit-transaction/:id" component={EditTransaction} />
+      <Route path="/auth" component={AuthPage} />
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 
@@ -39,8 +41,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
+        <AuthProvider>
+          <Toaster />
+          <Layout>
+            <Router />
+          </Layout>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

@@ -1,18 +1,58 @@
 import { useState } from "react";
-import { Link } from "wouter";
-import { Menu, X, Plus, User } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Menu, X, Plus, User, LogOut, Settings, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Sidebar from "./Sidebar";
 import NewTransactionModal from "./NewTransactionModal";
+import { useAuth } from "@/hooks/use-auth";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export default function Header() {
   const isMobile = useIsMobile();
+  const [, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNewTransactionModal, setShowNewTransactionModal] = useState(false);
+  const { user, logoutMutation } = useAuth();
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  const handleLogout = () => {
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => {
+        navigate("/auth");
+      }
+    });
+  };
+
+  const getUserInitials = () => {
+    if (!user) return "U";
+    if (user.first_name && user.last_name) {
+      return `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
+    }
+    return user.username.substring(0, 2).toUpperCase();
+  };
+
+  const getRoleColor = () => {
+    if (!user) return "bg-gray-300";
+    switch (user.role) {
+      case "superuser":
+        return "bg-red-100 text-red-700";
+      case "admin":
+        return "bg-blue-100 text-blue-700";
+      default:
+        return "bg-green-100 text-green-700";
+    }
   };
 
   return (
@@ -54,20 +94,58 @@ export default function Header() {
             </Link>
           </div>
           <div className="flex items-center space-x-4">
-            <Button
-              className="hidden md:flex"
-              onClick={() => setShowNewTransactionModal(true)}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              New Transaction
-            </Button>
-            <div className="relative">
-              <button className="flex items-center rounded-full bg-gray-100 p-1">
-                <div className="h-8 w-8 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center">
-                  <User className="h-5 w-5" />
-                </div>
-              </button>
-            </div>
+            {user ? (
+              <>
+                <Button
+                  className="hidden md:flex"
+                  onClick={() => setShowNewTransactionModal(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Transaction
+                </Button>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                      <Avatar className={getRoleColor()}>
+                        <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuLabel>
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{user.first_name} {user.last_name}</p>
+                        <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                        <p className="text-xs font-semibold mt-1 capitalize">{user.role}</p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>
+                      <UserCircle className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} disabled={logoutMutation.isPending}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>{logoutMutation.isPending ? "Logging out..." : "Logout"}</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+              <Button 
+                variant="default" 
+                size="sm"
+                onClick={() => navigate("/auth")}
+              >
+                Login
+              </Button>
+            )}
           </div>
         </div>
       </header>
