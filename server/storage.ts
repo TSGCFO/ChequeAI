@@ -10,7 +10,12 @@ import {
   type AIMessage,
   type InsertAIMessage,
   type CustomerDeposit,
-  type InsertCustomerDeposit
+  type InsertCustomerDeposit,
+  type User,
+  type InsertUser,
+  type UpdateUser,
+  type UserConversation,
+  type InsertUserConversation
 } from "@shared/schema";
 
 export interface IStorage {
@@ -106,6 +111,23 @@ export class MemStorage implements IStorage {
   }
   
   private initializeSampleData() {
+    // Add default superuser
+    const superUser: User = {
+      user_id: this.nextUserId++,
+      username: "waldo196637",
+      password: "$2b$10$X2fgrTLGvvY5MkSh6RPdG.ks1zcnYaQZPOf5V9.4L3cWZ4Z8yJUjq", // Hashed password for "Hassan8488$@"
+      email: "hassansadiq73@gmail.com",
+      role: "superuser",
+      first_name: "Hassan",
+      last_name: "Sadiq",
+      is_active: true,
+      last_login: null,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+    
+    this.users.set(superUser.user_id, superUser);
+    
     // Add sample customers
     const customer1: Customer = {
       customer_id: this.nextCustomerId++,
@@ -750,14 +772,130 @@ export class MemStorage implements IStorage {
   }
 
   async getAIConversationHistory(conversationId: string): Promise<AIMessage[]> {
-    return this.aiMessages
+    // Get the conversation history with the max number of messages (for context window)
+    const MAX_HISTORY = 35; // Increased from 10 to 35 as per requirements
+    
+    const messages = this.aiMessages
       .filter(message => message.conversation_id === conversationId)
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    
+    // Return the most recent MAX_HISTORY messages or all if less than MAX_HISTORY
+    return messages.slice(-MAX_HISTORY);
+  }
+
+  // User management methods
+  async getUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
+  async getUser(id: number): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.username === username);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.email === email);
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const newUser: User = {
+      ...user,
+      user_id: this.nextUserId++,
+      created_at: new Date(),
+      updated_at: new Date(),
+      last_login: null
+    };
+
+    this.users.set(newUser.user_id, newUser);
+    return newUser;
+  }
+
+  async updateUser(id: number, userData: Partial<UpdateUser>): Promise<User | undefined> {
+    const existingUser = this.users.get(id);
+    
+    if (!existingUser) {
+      return undefined;
+    }
+    
+    const updatedUser: User = {
+      ...existingUser,
+      ...userData,
+      updated_at: new Date()
+    };
+    
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    // Check if user has conversations
+    const hasConversations = Array.from(this.userConversations.values()).some(
+      conversation => conversation.user_id === id
+    );
+    
+    if (hasConversations) {
+      // Delete associated conversations
+      const userConversations = Array.from(this.userConversations.values())
+        .filter(conversation => conversation.user_id === id);
+      
+      for (const conversation of userConversations) {
+        this.userConversations.delete(conversation.conversation_id);
+      }
+    }
+    
+    return this.users.delete(id);
+  }
+
+  // User conversation methods
+  async getUserConversations(userId: number): Promise<UserConversation[]> {
+    return Array.from(this.userConversations.values())
+      .filter(conversation => conversation.user_id === userId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  async getUserConversation(id: number): Promise<UserConversation | undefined> {
+    return this.userConversations.get(id);
+  }
+
+  async createUserConversation(conversation: InsertUserConversation): Promise<UserConversation> {
+    const newConversation: UserConversation = {
+      ...conversation,
+      conversation_id: this.nextConversationId++,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+
+    this.userConversations.set(newConversation.conversation_id, newConversation);
+    return newConversation;
+  }
+
+  async updateUserConversation(id: number, conversationData: Partial<InsertUserConversation>): Promise<UserConversation | undefined> {
+    const existingConversation = this.userConversations.get(id);
+    
+    if (!existingConversation) {
+      return undefined;
+    }
+    
+    const updatedConversation: UserConversation = {
+      ...existingConversation,
+      ...conversationData,
+      updated_at: new Date()
+    };
+    
+    this.userConversations.set(id, updatedConversation);
+    return updatedConversation;
+  }
+
+  async deleteUserConversation(id: number): Promise<boolean> {
+    return this.userConversations.delete(id);
   }
 }
 
 import { DatabaseStorage } from "./database-storage";
 
-// Comment out the MemStorage and use DatabaseStorage instead
-// export const storage = new MemStorage();
-export const storage = new DatabaseStorage();
+// Temporarily use MemStorage instead of DatabaseStorage due to DB connection issues
+export const storage = new MemStorage();
+// export const storage = new DatabaseStorage();
