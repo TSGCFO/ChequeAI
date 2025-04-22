@@ -1,9 +1,11 @@
 import OpenAI from "openai";
 import { storage } from "../storage";
-import { InsertTransaction, TransactionWithDetails, Customer, Vendor } from "@shared/schema";
+import { InsertTransaction, TransactionWithDetails, Customer, Vendor, userConversations } from "@shared/schema";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { db } from "../db";
+import { eq } from "drizzle-orm";
 
 // Initialize OpenAI with the API key from environment variables
 const openai = new OpenAI({ 
@@ -1763,7 +1765,13 @@ export async function generateAIResponse(userMessage: string, conversationId: st
     }
     
     // Get conversation history for context
-    const conversationHistory = await storage.getAIConversationHistory(conversationId);
+    let conversationHistory = await storage.getAIConversationHistory(conversationId);
+    
+    // Increase context window to 35 messages (as requested)
+    // If there are more than 35 messages, keep only the most recent 35
+    if (conversationHistory.length > 35) {
+      conversationHistory = conversationHistory.slice(-35);
+    }
     
     // Build messages array for OpenAI with conversation history
     const messages = [
