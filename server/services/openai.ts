@@ -1799,8 +1799,8 @@ export async function generateAIResponse(userMessage: string, conversationId: st
       }
     ];
     
-    // Add conversation history (limit to last 10 messages for context)
-    const recentMessages = conversationHistory.slice(-10);
+    // Add conversation history (limit to last 35 messages for context)
+    const recentMessages = conversationHistory.slice(-35);
     recentMessages.forEach(msg => {
       messages.push({
         role: msg.role as "user" | "assistant",
