@@ -114,7 +114,33 @@ export async function getBusinessSummary() {
       : "0.00";
 
     // Since there's no status column, we'll calculate based on payment status
-    // Get "pending" transaction count (not fully paid to customer)
+    // Try first using the status column if it exists
+    try {
+      // Get "pending" transaction count (using status column)
+      const pendingStatusCountResult = await pool.query(
+        "SELECT COUNT(*) FROM cheque_transactions WHERE status = $1", ['pending']
+      );
+      const pendingTransactions = parseInt(pendingStatusCountResult.rows[0].count) || 0;
+
+      // Get "completed" transaction count (using status column)
+      const completedStatusCountResult = await pool.query(
+        "SELECT COUNT(*) FROM cheque_transactions WHERE status = $1", ['completed']
+      );
+      const completedTransactions = parseInt(completedStatusCountResult.rows[0].count) || 0;
+
+      return {
+        totalTransactions,
+        totalAmount,
+        totalProfit,
+        outstandingBalance,
+        pendingTransactions,
+        completedTransactions
+      };
+    } catch (statusError) {
+      console.log("Status column not available, using payment status", statusError);
+    }
+
+    // Fallback: Get "pending" transaction count (not fully paid to customer)
     const pendingCountResult = await pool.query(
       "SELECT COUNT(*) FROM cheque_transactions WHERE net_payable_to_customer > COALESCE(paid_to_customer, 0)"
     );

@@ -200,27 +200,30 @@ export class DatabaseStorage implements IStorage {
   // Business summary
   async getBusinessSummary(): Promise<BusinessSummary> {
     try {
-      // Get total transactions count
-      const [transactionCount] = await db
-        .select({ count: count() })
-        .from(chequeTransactions);
-  
-      // Get total amount processed
-      const [totalAmountResult] = await db
-        .select({ sum: sum(chequeTransactions.cheque_amount) })
-        .from(chequeTransactions);
-  
-      // Get total profit
-      const [totalProfitResult] = await db
-        .select({ sum: sum(chequeTransactions.profit) })
-        .from(chequeTransactions);
-  
-      // Get outstanding balance - we'll query differently since we need the WHERE clause to be fixed
-      // The issue is likely here, we're checking for string 'pending' but the status is an enum or different format
-      // Let's use direct SQL instead of ORM for this specific query to ensure we get the right data
+      // Due to TypeScript errors with ORM, we'll use direct SQL for all queries
+      // This is a cleaner approach and avoids potential SQL syntax issues
       const { pool } = await import('./db');
       
-      // We'll use SQL for outstanding balance, pending and completed counts since this is causing the issue
+      // Get transaction count
+      const transactionCountSQL = "SELECT COUNT(*) FROM cheque_transactions";
+      const transactionCountResult = await pool.query(transactionCountSQL);
+      const totalTransactions = parseInt(transactionCountResult.rows[0].count) || 0;
+      
+      // Get total amount
+      const totalAmountSQL = "SELECT SUM(cheque_amount) FROM cheque_transactions";
+      const totalAmountResult = await pool.query(totalAmountSQL);
+      const totalAmount = totalAmountResult.rows[0].sum 
+        ? parseFloat(totalAmountResult.rows[0].sum).toFixed(2) 
+        : "0.00";
+        
+      // Get total profit
+      const totalProfitSQL = "SELECT SUM(profit) FROM cheque_transactions";
+      const totalProfitResult = await pool.query(totalProfitSQL);
+      const totalProfit = totalProfitResult.rows[0].sum 
+        ? parseFloat(totalProfitResult.rows[0].sum).toFixed(2) 
+        : "0.00";
+      
+      // Get outstanding balance from pending transactions
       const outstandingBalanceSQL = "SELECT SUM(cheque_amount) FROM cheque_transactions WHERE status = $1";
       const outstandingBalanceSQLResult = await pool.query(outstandingBalanceSQL, ['pending']);
       const outstandingBalance = outstandingBalanceSQLResult.rows[0].sum 
@@ -236,12 +239,8 @@ export class DatabaseStorage implements IStorage {
       const completedCountResult = await pool.query(completedCountSQL, ['completed']);
       const completedTransactions = parseInt(completedCountResult.rows[0].count) || 0;
   
-      // Format currency values for the other fields
-      const totalAmount = totalAmountResult.sum ? parseFloat(totalAmountResult.sum.toString()).toFixed(2) : "0.00";
-      const totalProfit = totalProfitResult.sum ? parseFloat(totalProfitResult.sum.toString()).toFixed(2) : "0.00";
-  
       return {
-        totalTransactions: transactionCount.count,
+        totalTransactions,
         totalAmount,
         totalProfit,
         outstandingBalance,

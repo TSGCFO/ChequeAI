@@ -1813,20 +1813,56 @@ export async function generateAIResponse(userMessage: string, conversationId: st
       // Fetch relevant data to enhance the response
       try {
         const businessSummary = await storage.getBusinessSummary();
-        // Get more transactions if the user is specifically asking for them
-        const limit = isAllTransactionsQuery ? 20 : 5;
-        const recentTransactions = await storage.getTransactions({ limit: limit });
+        
+        // Get transactions based on the specific type of query
+        let limit = 5; // Default limit
+        let customData = null;
+        
+        if (isAllTransactionsQuery) {
+          // If asking for all transactions, fetch a larger number
+          limit = 50; // Increased to ensure we get more complete transaction data
+        }
+        
+        // Get the appropriate data for the query
+        if (/balance/i.test(userMessage)) {
+          // For balance queries, include customer balance report
+          try {
+            customData = await storage.getReportData("customer_balances");
+          } catch (error) {
+            console.error("Error getting customer balances:", error);
+          }
+        } else if (/profit/i.test(userMessage)) {
+          // For profit queries, include profit by customer report
+          try {
+            customData = await storage.getReportData("profit_by_customer");
+          } catch (error) {
+            console.error("Error getting profit by customer:", error);
+          }
+        }
+        
+        // Get transactions
+        const recentTransactions = await storage.getTransactions({ limit });
+        
+        // Build the system message with all relevant data
+        let systemContent = `Here is some recent data to help with your response:
+                    Business Summary: ${JSON.stringify(businessSummary)}
+                    ${isAllTransactionsQuery ? 'All' : 'Recent'} Transactions: ${JSON.stringify(recentTransactions)}`;
+                    
+        // Add any custom report data if available
+        if (customData && customData.length > 0) {
+          systemContent += `\n\nAdditional Report Data: ${JSON.stringify(customData)}`;
+        }
+        
+        // Add instructions for formatting
+        systemContent += `\n\nWhen showing transactions in your response, format them in a clear, readable way.
+                    The database has a total of ${businessSummary.totalTransactions} transactions.
+                    If the user asks about specific data that's not provided, let them know what you can find 
+                    from the information available.`;
         
         // Add data context to system message
         messages.unshift({
           role: "system",
-          content: `Here is some recent data to help with your response:
-                    Business Summary: ${JSON.stringify(businessSummary)}
-                    ${isAllTransactionsQuery ? 'All' : 'Recent'} Transactions: ${JSON.stringify(recentTransactions)}
-                    
-                    When showing transactions in your response, format them in a clear, readable way.
-                    The database has a total of ${businessSummary.totalTransactions} transactions.
-                    If the user asks about transactions beyond the ones provided, let them know you've shown what's available.`
+          content: systemContent
         });
       } catch (error) {
         console.error("Error fetching data for AI context:", error);
