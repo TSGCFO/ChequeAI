@@ -35,7 +35,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState("login");
   const [, navigate] = useLocation();
-  const { user, isLoading, loginMutation } = useAuth();
+  const { user, isLoading, loginMutation, registerMutation } = useAuth();
 
   // Redirect if already logged in
   useEffect(() => {
@@ -69,11 +69,12 @@ export default function AuthPage() {
   }
 
   function onRegisterSubmit(data: RegisterFormValues) {
-    // Note: In a real application, we would handle registration here
-    // Since we're only implementing the login/logout flows as requested
-    // and regular users cannot register themselves, this is just a placeholder
-    console.log("Registration data:", data);
-    alert("Registration is only available through admin invitation");
+    // Remove the confirmPassword field before submitting to the server
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { confirmPassword, ...userData } = data;
+    
+    // Register mutation will handle all the feedback
+    registerMutation.mutate(userData);
   }
 
   if (isLoading) {
@@ -248,8 +249,19 @@ export default function AuthPage() {
                           </FormItem>
                         )}
                       />
-                      <Button type="submit" className="w-full">
-                        Register
+                      <Button 
+                        type="submit" 
+                        className="w-full"
+                        disabled={registerMutation.isPending}
+                      >
+                        {registerMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Registering...
+                          </>
+                        ) : (
+                          "Register"
+                        )}
                       </Button>
                     </form>
                   </Form>
