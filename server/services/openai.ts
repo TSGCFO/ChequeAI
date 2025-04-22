@@ -857,13 +857,13 @@ async function handleChequeProcessingCommand(
         // Clean amount string by removing currency symbols, commas, etc.
         const cleanAmount = amount.toString().replace(/[$,]/g, '');
         
+        // Create transaction with only the required fields
         const newTransaction: InsertTransaction = {
           customer_id: customerId,
           cheque_number: chequeNumber,
           cheque_amount: cleanAmount,
-          vendor_id: vendorId,
-          // Don't set a date - allow the database default to handle it
-          date: null
+          vendor_id: vendorId
+          // Don't include date field at all - let database handle defaults
         };
 
         // Show transaction summary and ask for confirmation
@@ -874,7 +874,6 @@ Customer ID: ${newTransaction.customer_id}
 Cheque Number: ${newTransaction.cheque_number}
 Amount: $${newTransaction.cheque_amount}
 Vendor ID: ${newTransaction.vendor_id}
-Date: ${newTransaction.date}
 Status: pending
 
 Type "confirm" to create this transaction or "cancel" to abort.`,
