@@ -148,7 +148,6 @@ export default function ProfilePage() {
   }
   
   return (
-    <Layout>
       <div className="container mx-auto py-6">
         <div className="mb-6">
           <h1 className="text-3xl font-bold">Profile Settings</h1>
@@ -380,6 +379,5 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-    </Layout>
   );
 }
