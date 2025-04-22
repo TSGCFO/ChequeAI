@@ -1947,9 +1947,9 @@ export async function processVoiceMessage(audioBuffer: Buffer, conversationId: s
 }
 
 /**
- * Process a cheque image or PDF and handle the transaction flow
- * @param fileBuffer The file buffer of the image or PDF
- * @param fileType The MIME type of the file ('image/jpeg', 'image/png', 'application/pdf', etc.)
+ * Process a cheque image and handle the transaction flow
+ * @param fileBuffer The file buffer of the image
+ * @param fileType The MIME type of the file ('image/jpeg', 'image/png', etc.)
  * @param conversationId The conversation ID for context
  * @returns AI-generated response about the cheque(s) found
  */
@@ -1965,38 +1965,8 @@ export async function processChequeDocument(
     fs.writeFileSync(tempFilePath, fileBuffer);
     
     try {
-      let base64Data: string;
-      
-      // Check if the file is a PDF
-      if (fileType === 'application/pdf') {
-        try {
-          // For PDFs, we need to convert to an image first
-          console.log("Processing PDF document...");
-          
-          // Use our PDF converter utility
-          const { convertPdfToImage } = require('../../pdf-converter');
-          
-          try {
-            console.log("Converting PDF to image...");
-            // Convert the PDF to an image
-            const imageBuffer = await convertPdfToImage(fileBuffer);
-            
-            // Convert the image buffer to base64
-            base64Data = imageBuffer.toString('base64');
-            console.log("PDF successfully converted to image");
-          } catch (error) {
-            console.error("Error processing PDF:", error);
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            throw new Error(`Error processing PDF: ${errorMsg}`);
-          }
-        } catch (importError) {
-          console.error("Error importing PDF libraries:", importError);
-          return "I'm having trouble processing PDF files at the moment. Please try uploading an image of the cheque instead (JPEG, PNG, etc.).";
-        }
-      } else {
-        // For images, directly convert to base64
-        base64Data = fileBuffer.toString('base64');
-      }
+      // Convert image to base64
+      const base64Data = fileBuffer.toString('base64');
       
       // Save the document message to conversation history
       let userMessageContent = fileType === 'application/pdf' 
