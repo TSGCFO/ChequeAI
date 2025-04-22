@@ -1,10 +1,13 @@
 import { 
   customers, vendors, chequeTransactions,
   customerDeposits, vendorPayments, aiMessages,
+  users, userConversations,
   type Customer, type Vendor, type ChequeTransaction, 
   type CustomerDeposit, type VendorPayment, type AIMessage,
+  type User, type UserConversation,
   type InsertCustomer, type InsertVendor, type InsertTransaction, 
   type InsertCustomerDeposit, type InsertVendorPayment, type InsertAIMessage,
+  type InsertUser, type InsertUserConversation, type UpdateUser,
   type TransactionWithDetails, type BusinessSummary
 } from "@shared/schema";
 
@@ -347,15 +350,198 @@ export class DatabaseStorage implements IStorage {
 
   async getAIConversationHistory(conversationId: string): Promise<AIMessage[]> {
     try {
-      // Fix the query to use the correct column name for timestamp
-      return await db
+      // Get the conversation history with the max number of messages (for context window)
+      const MAX_HISTORY = 35; // Increased from 10 to 35 as per requirements
+      
+      const messages = await db
         .select()
         .from(aiMessages)
         .where(eq(aiMessages.conversation_id, conversationId))
         .orderBy(aiMessages.created_at);
+      
+      // Return the most recent MAX_HISTORY messages or all if less than MAX_HISTORY
+      return messages.slice(-MAX_HISTORY);
     } catch (error) {
       console.error("Error retrieving AI conversation history:", error);
       return []; // Return empty array instead of throwing to prevent app crashes
+    }
+  }
+
+  // User management methods
+  async getUsers(): Promise<User[]> {
+    try {
+      return await db.select().from(users);
+    } catch (error) {
+      console.error("Error retrieving users:", error);
+      return [];
+    }
+  }
+
+  async getUser(id: number): Promise<User | undefined> {
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.user_id, id));
+      
+      return user;
+    } catch (error) {
+      console.error(`Error retrieving user with ID ${id}:`, error);
+      return undefined;
+    }
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username));
+      
+      return user;
+    } catch (error) {
+      console.error(`Error retrieving user with username ${username}:`, error);
+      return undefined;
+    }
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email));
+      
+      return user;
+    } catch (error) {
+      console.error(`Error retrieving user with email ${email}:`, error);
+      return undefined;
+    }
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    try {
+      const [result] = await db
+        .insert(users)
+        .values(user)
+        .returning();
+      
+      return result;
+    } catch (error) {
+      console.error("Error creating user:", error);
+      throw error;
+    }
+  }
+
+  async updateUser(id: number, userData: Partial<UpdateUser>): Promise<User | undefined> {
+    try {
+      const [result] = await db
+        .update(users)
+        .set({
+          ...userData,
+          updated_at: new Date()
+        })
+        .where(eq(users.user_id, id))
+        .returning();
+      
+      return result;
+    } catch (error) {
+      console.error(`Error updating user with ID ${id}:`, error);
+      return undefined;
+    }
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    try {
+      // First delete associated user conversations
+      await db
+        .delete(userConversations)
+        .where(eq(userConversations.user_id, id));
+        
+      // Then delete the user
+      const result = await db
+        .delete(users)
+        .where(eq(users.user_id, id))
+        .returning();
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error deleting user with ID ${id}:`, error);
+      return false;
+    }
+  }
+
+  // User conversation methods
+  async getUserConversations(userId: number): Promise<UserConversation[]> {
+    try {
+      return await db
+        .select()
+        .from(userConversations)
+        .where(eq(userConversations.user_id, userId))
+        .orderBy(desc(userConversations.updated_at));
+    } catch (error) {
+      console.error(`Error retrieving conversations for user ${userId}:`, error);
+      return [];
+    }
+  }
+
+  async getUserConversation(id: number): Promise<UserConversation | undefined> {
+    try {
+      const [conversation] = await db
+        .select()
+        .from(userConversations)
+        .where(eq(userConversations.conversation_id, id));
+      
+      return conversation;
+    } catch (error) {
+      console.error(`Error retrieving conversation with ID ${id}:`, error);
+      return undefined;
+    }
+  }
+
+  async createUserConversation(conversation: InsertUserConversation): Promise<UserConversation> {
+    try {
+      const [result] = await db
+        .insert(userConversations)
+        .values(conversation)
+        .returning();
+      
+      return result;
+    } catch (error) {
+      console.error("Error creating user conversation:", error);
+      throw error;
+    }
+  }
+
+  async updateUserConversation(id: number, conversationData: Partial<InsertUserConversation>): Promise<UserConversation | undefined> {
+    try {
+      const [result] = await db
+        .update(userConversations)
+        .set({
+          ...conversationData,
+          updated_at: new Date()
+        })
+        .where(eq(userConversations.conversation_id, id))
+        .returning();
+      
+      return result;
+    } catch (error) {
+      console.error(`Error updating conversation with ID ${id}:`, error);
+      return undefined;
+    }
+  }
+
+  async deleteUserConversation(id: number): Promise<boolean> {
+    try {
+      const result = await db
+        .delete(userConversations)
+        .where(eq(userConversations.conversation_id, id))
+        .returning();
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error deleting conversation with ID ${id}:`, error);
+      return false;
     }
   }
 }
