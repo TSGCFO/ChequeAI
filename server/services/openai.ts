@@ -1973,54 +1973,21 @@ export async function processChequeDocument(
           // For PDFs, we need to convert to an image first
           console.log("Processing PDF document...");
           
-          // Import PDF handling libraries
-          const { PDFDocument } = await import('pdf-lib');
-          const { fromPath } = await import('pdf2pic');
-          const sharp = await import('sharp');
+          // Use our PDF converter utility
+          const { convertPdfToImage } = require('../../pdf-converter');
           
-          // First, validate that this is actually a PDF
           try {
-            const pdfDoc = await PDFDocument.load(fileBuffer);
-            const pageCount = pdfDoc.getPageCount();
-            
-            if (pageCount === 0) {
-              throw new Error("PDF contains no pages");
-            }
-            
-            console.log(`PDF contains ${pageCount} pages`);
-            
-            // Setup the conversion options
-            const options = {
-              density: 300,          // Higher density for better quality
-              saveFilename: "page",  // Output filename pattern
-              savePath: os.tmpdir(), // Output directory
-              format: "png",         // Output format
-              width: 2000,           // Output width in pixels
-              height: 2000           // Output height in pixels
-            };
-            
-            // Convert the first page of the PDF to an image
-            const convert = fromPath(tempFilePath, options);
-            const pageToConvertAsImage = 1;
-            
             console.log("Converting PDF to image...");
-            const result = await convert(pageToConvertAsImage, { responseType: "buffer" });
+            // Convert the PDF to an image
+            const imageBuffer = await convertPdfToImage(fileBuffer);
             
-            if (!result || !result.buffer) {
-              throw new Error("Failed to convert PDF to image");
-            }
-            
-            // Optimize the image using sharp
-            const optimizedImageBuffer = await sharp(result.buffer)
-              .jpeg({ quality: 95 })
-              .toBuffer();
-            
-            // Convert the optimized image to base64
-            base64Data = optimizedImageBuffer.toString('base64');
+            // Convert the image buffer to base64
+            base64Data = imageBuffer.toString('base64');
             console.log("PDF successfully converted to image");
-          } catch (pdfError) {
-            console.error("Error processing PDF:", pdfError);
-            throw new Error(`Error processing PDF: ${pdfError.message}`);
+          } catch (error) {
+            console.error("Error processing PDF:", error);
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            throw new Error(`Error processing PDF: ${errorMsg}`);
           }
         } catch (importError) {
           console.error("Error importing PDF libraries:", importError);
