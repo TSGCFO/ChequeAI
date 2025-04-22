@@ -57,6 +57,22 @@ export interface IStorage {
   // AI Assistant methods
   saveAIMessage(message: InsertAIMessage): Promise<AIMessage>;
   getAIConversationHistory(conversationId: string): Promise<AIMessage[]>;
+  
+  // User methods
+  getUsers(): Promise<User[]>;
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, user: Partial<UpdateUser>): Promise<User | undefined>;
+  deleteUser(id: number): Promise<boolean>;
+  
+  // User conversation methods
+  getUserConversations(userId: number): Promise<UserConversation[]>;
+  getUserConversation(id: number): Promise<UserConversation | undefined>;
+  createUserConversation(conversation: InsertUserConversation): Promise<UserConversation>;
+  updateUserConversation(id: number, conversation: Partial<InsertUserConversation>): Promise<UserConversation | undefined>;
+  deleteUserConversation(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -64,18 +80,26 @@ export class MemStorage implements IStorage {
   private customers: Map<number, Customer>;
   private vendors: Map<string, Vendor>;
   private aiMessages: AIMessage[];
+  private users: Map<number, User>;
+  private userConversations: Map<number, UserConversation>;
   private nextTransactionId: number;
   private nextCustomerId: number;
   private nextMessageId: number;
+  private nextUserId: number;
+  private nextConversationId: number;
   
   constructor() {
     this.transactions = new Map();
     this.customers = new Map();
     this.vendors = new Map();
     this.aiMessages = [];
+    this.users = new Map();
+    this.userConversations = new Map();
     this.nextTransactionId = 1;
     this.nextCustomerId = 1;
     this.nextMessageId = 1;
+    this.nextUserId = 1;
+    this.nextConversationId = 1;
     
     // Add sample data
     this.initializeSampleData();

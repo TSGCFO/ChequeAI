@@ -1,15 +1,13 @@
+import { Express, Request, Response, NextFunction } from "express";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { db } from "./db";
-import { users, User, userRoleEnum } from "@shared/schema";
-import { eq } from "drizzle-orm";
-import connectPg from "connect-pg-simple";
-import { pool } from "./db";
+import { storage } from "./storage";
+import { User, userRoleEnum } from "@shared/schema";
 
+// Extend Express User interface with our User type
 declare global {
   namespace Express {
     interface User extends User {}
@@ -45,33 +43,38 @@ export async function comparePasswords(supplied: string, stored: string): Promis
  * @param username Username to check
  */
 export async function userExists(username: string): Promise<boolean> {
-  const existingUser = await db.select().from(users).where(eq(users.username, username));
-  return existingUser.length > 0;
+  const user = await storage.getUserByUsername(username);
+  return !!user;
 }
 
 /**
  * Function to create the initial superuser if no users exist
  */
 export async function createSuperuserIfNeeded(): Promise<void> {
-  // Check if any users exist
-  const existingUsers = await db.select().from(users);
-  
-  if (existingUsers.length === 0) {
-    // Create superuser
-    console.log("No users found, creating superuser account");
-    const hashedPassword = await hashPassword("Hassan8488$@");
+  try {
+    // Check if any users exist
+    const users = await storage.getUsers();
     
-    await db.insert(users).values({
-      username: "waldo196637",
-      password: hashedPassword,
-      email: "hassansadiq73@gmail.com",
-      role: "superuser",
-      first_name: "Super",
-      last_name: "User",
-      is_active: true
-    });
-    
-    console.log("Superuser account created successfully");
+    if (users.length === 0) {
+      console.log("No users found, creating default superuser...");
+      
+      // Create superuser
+      const hashedPassword = await hashPassword("Hassan8488$@");
+      
+      await storage.createUser({
+        username: "waldo196637",
+        password: hashedPassword,
+        email: "hassansadiq73@gmail.com",
+        role: "superuser",
+        first_name: "Hassan",
+        last_name: "Sadiq",
+        is_active: true
+      });
+      
+      console.log("Default superuser created successfully.");
+    }
+  } catch (error) {
+    console.error("Error creating superuser:", error);
   }
 }
 
@@ -79,48 +82,47 @@ export async function createSuperuserIfNeeded(): Promise<void> {
  * Function to set up authentication for the Express app
  */
 export function setupAuth(app: Express): void {
-  // Initialize PostgreSQL session store
-  const PostgresSessionStore = connectPg(session);
-  
-  // Set up session
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "a-very-secret-key-replace-in-production",
+    secret: process.env.SESSION_SECRET || "your-secret-key",
     resave: false,
     saveUninitialized: false,
-    store: new PostgresSessionStore({
-      pool,
-      tableName: "user_sessions", // Optional. Default is "session"
-      createTableIfMissing: true
-    }),
     cookie: {
       secure: process.env.NODE_ENV === "production",
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      maxAge: 1000 * 60 * 60 * 24 // 24 hours
     }
   };
-  
+
   app.use(session(sessionSettings));
   app.use(passport.initialize());
   app.use(passport.session());
-  
-  // Set up LocalStrategy for username/password authentication
+
+  // Configure local strategy for username/password authentication
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
-        const [user] = await db.select().from(users).where(eq(users.username, username));
+        // Find user by username
+        const user = await storage.getUserByUsername(username);
         
-        if (!user || !(await comparePasswords(password, user.password))) {
-          return done(null, false, { message: "Invalid username or password" });
+        if (!user) {
+          return done(null, false, { message: "Username not found" });
         }
         
+        // Check if user is active
         if (!user.is_active) {
-          return done(null, false, { message: "Account is disabled" });
+          return done(null, false, { message: "Account is inactive" });
+        }
+        
+        // Check password
+        const isPasswordValid = await comparePasswords(password, user.password);
+        
+        if (!isPasswordValid) {
+          return done(null, false, { message: "Incorrect password" });
         }
         
         // Update last login time
-        await db
-          .update(users)
-          .set({ last_login: new Date() })
-          .where(eq(users.user_id, user.user_id));
+        await storage.updateUser(user.user_id, {
+          last_login: new Date()
+        });
         
         return done(null, user);
       } catch (error) {
@@ -128,24 +130,24 @@ export function setupAuth(app: Express): void {
       }
     })
   );
-  
+
   // Serialize user to session
-  passport.serializeUser((user: Express.User, done) => {
+  passport.serializeUser((user, done) => {
     done(null, user.user_id);
   });
-  
+
   // Deserialize user from session
   passport.deserializeUser(async (id: number, done) => {
     try {
-      const [user] = await db.select().from(users).where(eq(users.user_id, id));
+      const user = await storage.getUser(id);
       done(null, user);
     } catch (error) {
       done(error);
     }
   });
-  
-  // Set up auth routes
-  app.post("/api/auth/login", (req, res, next) => {
+
+  // Routes for authentication
+  app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", (err: Error, user: Express.User, info: { message: string }) => {
       if (err) {
         return next(err);
@@ -155,52 +157,43 @@ export function setupAuth(app: Express): void {
         return res.status(401).json({ message: info.message || "Authentication failed" });
       }
       
-      req.login(user, (err) => {
-        if (err) {
-          return next(err);
+      req.login(user, (loginErr) => {
+        if (loginErr) {
+          return next(loginErr);
         }
         
-        // Return basic user info (excluding password)
-        const { password, ...userInfo } = user;
-        return res.status(200).json(userInfo);
+        // Return user without password
+        const safeUser = {
+          ...user,
+          password: undefined
+        };
+        
+        return res.json(safeUser);
       });
     })(req, res, next);
   });
-  
-  app.post("/api/auth/logout", (req, res) => {
+
+  app.post("/api/logout", (req, res) => {
     req.logout((err) => {
       if (err) {
         return res.status(500).json({ message: "Error logging out" });
       }
-      res.status(200).json({ message: "Logged out successfully" });
+      res.sendStatus(200);
     });
   });
-  
-  app.get("/api/auth/user", (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    
-    // Return basic user info (excluding password)
-    const { password, ...userInfo } = req.user as User;
-    res.status(200).json(userInfo);
-  });
-  
-  // Create superuser if no users exist
-  createSuperuserIfNeeded().catch(err => {
-    console.error("Error creating superuser:", err);
-  });
+
+  // Create default superuser if needed
+  createSuperuserIfNeeded();
 }
 
 /**
  * Middleware to require authentication
  */
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  if (req.isAuthenticated()) {
-    return next();
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Authentication required" });
   }
-  
-  res.status(401).json({ message: "Authentication required" });
+  next();
 }
 
 /**
