@@ -49,11 +49,13 @@ export default function Settings() {
   const { user } = useAuth();
   const [selectedTab, setSelectedTab] = useState("account");
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
   // Fetch users from the API
   const [users, setUsers] = useState([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   
   // Fetch users when the tab changes to "users"
   useEffect(() => {
@@ -94,6 +96,15 @@ export default function Settings() {
     role: "user"
   });
   
+  // Edit user form state
+  const [editUserForm, setEditUserForm] = useState<Partial<UserFormData>>({
+    email: "",
+    first_name: "",
+    last_name: "",
+    role: "user",
+    is_active: true
+  });
+  
   // Sample form state for general settings
   const [formData, setFormData] = useState({
     companyName: "Cheque Ledger Pro",
@@ -122,8 +133,22 @@ export default function Settings() {
     setNewUserForm({ ...newUserForm, [name]: value });
   };
   
-  const handleRoleChange = (value: "user" | "admin" | "superuser") => {
+  // Handle changes in the edit user form
+  const handleEditUserInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setEditUserForm({ ...editUserForm, [name]: value });
+  };
+  
+  const handleNewUserRoleChange = (value: "user" | "admin" | "superuser") => {
     setNewUserForm({ ...newUserForm, role: value });
+  };
+  
+  const handleEditUserRoleChange = (value: "user" | "admin" | "superuser") => {
+    setEditUserForm({ ...editUserForm, role: value });
+  };
+  
+  const handleEditUserStatusChange = (checked: boolean) => {
+    setEditUserForm({ ...editUserForm, is_active: checked });
   };
   
   const handleSaveSettings = () => {
@@ -202,6 +227,76 @@ export default function Settings() {
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  const handleEditUser = async () => {
+    // Don't allow regular users to modify admin/superuser
+    if (!isSuperuser && selectedUser.role !== "user") {
+      toast({
+        title: "Permission Denied",
+        description: "Only superusers can modify admin accounts",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      // Call the API to update the user
+      const response = await fetch(`/api/users/${selectedUser.user_id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: editUserForm.email,
+          first_name: editUserForm.first_name,
+          last_name: editUserForm.last_name,
+          role: editUserForm.role,
+          is_active: editUserForm.is_active
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update user');
+      }
+      
+      // Refresh the list of users
+      fetchUsers();
+      
+      setIsEditUserDialogOpen(false);
+      
+      toast({
+        title: "User Updated",
+        description: "User has been updated successfully."
+      });
+    } catch (error) {
+      console.error('Error updating user:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to update user',
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleStartEditUser = (userToEdit: any) => {
+    setSelectedUser(userToEdit);
+    
+    // Pre-fill the edit form with the user's current data
+    setEditUserForm({
+      email: userToEdit.email,
+      first_name: userToEdit.first_name || '',
+      last_name: userToEdit.last_name || '',
+      role: userToEdit.role,
+      is_active: userToEdit.is_active
+    });
+    
+    setIsEditUserDialogOpen(true);
   };
   
   const handleDeleteUser = async (userId: number) => {
@@ -484,7 +579,7 @@ export default function Settings() {
                             <Label htmlFor="role">Role</Label>
                             <Select
                               value={newUserForm.role}
-                              onValueChange={(value: any) => handleRoleChange(value)}
+                              onValueChange={(value: any) => handleNewUserRoleChange(value)}
                             >
                               <SelectTrigger id="role">
                                 <SelectValue placeholder="Select a role" />
