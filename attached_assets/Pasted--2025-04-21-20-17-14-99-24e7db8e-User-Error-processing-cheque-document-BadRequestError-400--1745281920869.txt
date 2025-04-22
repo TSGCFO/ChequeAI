@@ -1,0 +1,98 @@
+
+}
+2025-04-21 20:17:14.99
+24e7db8e
+User
+Error processing cheque document: BadRequestError: 400 You uploaded an unsupported image. Please make sure your image has of one the following formats: ['png', 'jpeg', 'gif', 'webp'].
+2025-04-21 20:17:14.99
+24e7db8e
+User
+at APIError.generate (file:///home/runner/workspace/node_modules/openai/error.mjs:41:20)
+2025-04-21 20:17:14.99
+24e7db8e
+User
+at OpenAI.makeStatusError (file:///home/runner/workspace/node_modules/openai/core.mjs:295:25)
+2025-04-21 20:17:14.99
+24e7db8e
+User
+at OpenAI.makeRequest (file:///home/runner/workspace/node_modules/openai/core.mjs:339:30)
+2025-04-21 20:17:14.99
+24e7db8e
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-04-21 20:17:14.99
+24e7db8e
+User
+at async processImage (file:///home/runner/workspace/dist/index.js:2144:22)
+2025-04-21 20:17:14.99
+24e7db8e
+User
+at async processChequeDocument (file:///home/runner/workspace/dist/index.js:2030:32)
+2025-04-21 20:17:14.99
+24e7db8e
+User
+at async TelegramBot. (file:///home/runner/workspace/dist/index.js:2422:24) {
+2025-04-21 20:17:14.99
+24e7db8e
+User
+status: 400,
+2025-04-21 20:17:14.99
+24e7db8e
+User
+headers: {
+2025-04-21 20:17:14.99
+24e7db8e
+User
+'access-control-expose-headers': 'X-Request-ID',
+2025-04-21 20:17:14.99
+24e7db8e
+User
+'alt-svc': 'h3=":443"; ma=86400',
+2025-04-21 20:17:14.99
+24e7db8e
+User
+'cf-cache-status': 'DYNAMIC',
+2025-04-21 20:17:14.99
+24e7db8e
+User
+'cf-ray': '9340efc13ae1fe20-ORD',
+2025-04-21 20:17:14.99
+24e7db8e
+User
+connection: 'keep-alive',
+2025-04-21 20:17:14.99
+24e7db8e
+User
+'content-length': '258',
+2025-04-21 20:17:14.99
+24e7db8e
+User
+'content-type': 'application/json',
+2025-04-21 20:17:14.99
+24e7db8e
+User
+date: 'Tue, 22 Apr 2025 00:17:10 GMT',
+2025-04-21 20:17:14.99
+24e7db8e
+User
+'openai-organization': 'tsg-fulfillment',
+2025-04-21 20:17:14.99
+24e7db8e
+User
+'openai-processing-ms': '28',
+2025-04-21 20:17:14.99
+24e7db8e
+User
+'openai-version': '2020-10-01',
+2025-04-21 20:17:14.99
+24e7db8e
+User
+server: 'cloudflare',
+2025-04-21 20:17:14.99
+24e7db8e
+User
+'set-cookie': '__cf_bm=J9Rplw1IlXfmMfroYDrpsoecm5qIHHzpdHcPgoQjASc-1745281030-1.0.1.1-oelzyr3Okq5Alt2iL7dZaYdmNVef4SWlMT7H79f9QNVTDGkfN1Aa199B0pjJz2gRwqVUT85ySAx6lZvWnh96oABd3H_B5aY_MOwfh9gQLw8; path=/; expires=Tue, 22-Apr-25 00:47:10 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None, _cfuvid=PDOMtMpQS8vlZb9D.qPnrY2vhzt0SzhkE1GRpoqbm5c-1745281030567-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None',
+2025-04-21 20:17:14.99
+24e7db8e
+User
+'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',

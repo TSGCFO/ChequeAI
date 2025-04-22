@@ -1965,23 +1965,91 @@ export async function processChequeDocument(
     fs.writeFileSync(tempFilePath, fileBuffer);
     
     try {
-      // Convert buffer to base64
-      const base64Data = fileBuffer.toString('base64');
+      let base64Data: string;
       
-      // Process the image to extract cheque information
-      const extractionResult = await processImage(base64Data);
+      // Check if the file is a PDF
+      if (fileType === 'application/pdf') {
+        try {
+          // For PDFs, we need to convert to an image first
+          console.log("Processing PDF document...");
+          
+          // Import PDF handling libraries
+          const { PDFDocument } = await import('pdf-lib');
+          const { fromPath } = await import('pdf2pic');
+          const sharp = await import('sharp');
+          
+          // First, validate that this is actually a PDF
+          try {
+            const pdfDoc = await PDFDocument.load(fileBuffer);
+            const pageCount = pdfDoc.getPageCount();
+            
+            if (pageCount === 0) {
+              throw new Error("PDF contains no pages");
+            }
+            
+            console.log(`PDF contains ${pageCount} pages`);
+            
+            // Setup the conversion options
+            const options = {
+              density: 300,          // Higher density for better quality
+              saveFilename: "page",  // Output filename pattern
+              savePath: os.tmpdir(), // Output directory
+              format: "png",         // Output format
+              width: 2000,           // Output width in pixels
+              height: 2000           // Output height in pixels
+            };
+            
+            // Convert the first page of the PDF to an image
+            const convert = fromPath(tempFilePath, options);
+            const pageToConvertAsImage = 1;
+            
+            console.log("Converting PDF to image...");
+            const result = await convert(pageToConvertAsImage, { responseType: "buffer" });
+            
+            if (!result || !result.buffer) {
+              throw new Error("Failed to convert PDF to image");
+            }
+            
+            // Optimize the image using sharp
+            const optimizedImageBuffer = await sharp(result.buffer)
+              .jpeg({ quality: 95 })
+              .toBuffer();
+            
+            // Convert the optimized image to base64
+            base64Data = optimizedImageBuffer.toString('base64');
+            console.log("PDF successfully converted to image");
+          } catch (pdfError) {
+            console.error("Error processing PDF:", pdfError);
+            throw new Error(`Error processing PDF: ${pdfError.message}`);
+          }
+        } catch (importError) {
+          console.error("Error importing PDF libraries:", importError);
+          return "I'm having trouble processing PDF files at the moment. Please try uploading an image of the cheque instead (JPEG, PNG, etc.).";
+        }
+      } else {
+        // For images, directly convert to base64
+        base64Data = fileBuffer.toString('base64');
+      }
       
-      // Save the image message to conversation history
+      // Save the document message to conversation history
+      let userMessageContent = fileType === 'application/pdf' 
+        ? "[User uploaded a PDF document with cheque(s)]" 
+        : "[User uploaded an image of cheque(s)]";
+      
       await storage.saveAIMessage({
         user_id: 0,
-        content: "[User uploaded an image of cheque(s)]",
+        content: userMessageContent,
         role: "user",
         conversation_id: conversationId
       });
       
+      // Process the image to extract cheque information
+      console.log("Processing image with OpenAI Vision API...");
+      const extractionResult = await processImage(base64Data);
+      
       // Check if the image contains cheques
       if (!extractionResult.isCheque) {
-        const response = "I don't see any bank cheques in the image. Were you trying to upload a cheque image? If yes, please reply 'yes' and I'll try again with a different detection method. Otherwise, please upload a clear image of a bank cheque.";
+        const response = "I don't see any bank cheques in the document. Were you trying to upload a cheque? If yes, please reply 'yes' and I'll try again with a different detection method. Otherwise, please upload a clear image or PDF of a bank cheque.";
         
         // Save the assistant's response to conversation history
         await storage.saveAIMessage({
@@ -2002,7 +2070,7 @@ export async function processChequeDocument(
       
       // Check confidence level
       if (extractionResult.confidence < 0.5) {
-        const response = "I can see what appears to be a cheque, but the image quality is too low for me to accurately extract the details. Please upload a clearer, well-lit image of the cheque. Make sure the cheque number and amount are clearly visible in the image.";
+        const response = "I can see what appears to be a cheque, but the document quality is too low for me to accurately extract the details. Please upload a clearer, well-lit document of the cheque. Make sure the cheque number and amount are clearly visible.";
         
         // Save the assistant's response to conversation history
         await storage.saveAIMessage({
@@ -2112,6 +2180,13 @@ After confirming, I can help you create a new transaction with this cheque.`;
  */
 export async function processImage(imageBase64: string) {
   try {
+    // Determine if the image is a valid base64 string
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
+      throw new Error('Invalid image data');
+    }
+    
+    console.log(`Processing image with OpenAI Vision API, data length: ${imageBase64.length} characters`);
+    
     // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
