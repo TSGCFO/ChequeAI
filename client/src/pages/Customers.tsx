@@ -111,7 +111,7 @@ export default function Customers() {
     }
   };
 
-  const openEditDialog = (customer: typeof customers[0]) => {
+  const openEditDialog = (customer: any) => {
     setCurrentCustomerId(customer.customer_id);
     form.reset({
       customer_name: customer.customer_name,
@@ -178,6 +178,17 @@ export default function Customers() {
                     </p>
                   </div>
                   <div className="flex space-x-2">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => {
+                        setCurrentCustomerId(customer.customer_id);
+                        setIsDepositDialogOpen(true);
+                      }}
+                      title="Add deposit"
+                    >
+                      <Wallet className="h-4 w-4 text-green-500" />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => openEditDialog(customer)}>
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -329,6 +340,14 @@ export default function Customers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Customer Deposit Dialog */}
+      <CustomerDepositDialog 
+        isOpen={isDepositDialogOpen}
+        onOpenChange={setIsDepositDialogOpen}
+        customers={customersArray}
+        selectedCustomerId={currentCustomerId}
+      />
     </div>
   );
 }
