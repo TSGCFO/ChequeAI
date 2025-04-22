@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
-import { insertTransactionSchema, insertCustomerSchema, insertVendorSchema } from "@shared/schema";
+import { insertTransactionSchema, insertCustomerSchema, insertVendorSchema, userConversations } from "@shared/schema";
 import OpenAI from "openai";
 import multer from "multer";
 import { processDocument } from "./services/documentProcessor";
@@ -10,6 +10,8 @@ import { sendTelegramMessage } from "./services/telegram";
 import { generateAIResponse, processChequeDocument } from "./services/openai";
 import { setupAuth, requireAuth } from "./auth";
 import { registerUserRoutes } from "./user-routes";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 // Configure multer for file uploads
 const upload = multer({
