@@ -10,6 +10,7 @@ import Vendors from "@/pages/Vendors";
 import Reports from "@/pages/Reports";
 import Documents from "@/pages/Documents";
 import Settings from "@/pages/Settings";
+import ProfilePage from "@/pages/profile-page";
 import EditTransaction from "@/pages/EditTransaction";
 import Layout from "@/components/Layout";
 import { useEffect } from "react";
@@ -30,6 +31,7 @@ function Router() {
       <ProtectedRoute path="/reports" component={Reports} />
       <ProtectedRoute path="/documents" component={Documents} />
       <ProtectedRoute path="/settings" component={Settings} />
+      <ProtectedRoute path="/profile" component={ProfilePage} />
       <ProtectedRoute path="/edit-transaction/:id" component={EditTransaction} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
