@@ -2,7 +2,14 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
-import { insertTransactionSchema, insertCustomerSchema, insertVendorSchema, userConversations } from "@shared/schema";
+import { 
+  insertTransactionSchema, 
+  insertCustomerSchema, 
+  insertVendorSchema, 
+  userConversations, 
+  insertCustomerDepositSchema,
+  type User
+} from "@shared/schema";
 import OpenAI from "openai";
 import multer from "multer";
 import { processDocument } from "./services/documentProcessor";
@@ -358,6 +365,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting customer:", error);
       res.status(500).json({ message: "Failed to delete customer" });
+    }
+  });
+  
+  // Create customer deposit
+  app.post(`${apiRouter}/deposits`, requireAuth, async (req, res) => {
+    try {
+      const validatedData = insertCustomerDepositSchema.parse(req.body);
+      const deposit = await storage.createCustomerDeposit(validatedData);
+      res.status(201).json(deposit);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error creating customer deposit:", error);
+      res.status(500).json({ message: "Failed to create customer deposit" });
     }
   });
 
