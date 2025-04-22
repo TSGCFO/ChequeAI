@@ -349,7 +349,7 @@ export default function Reports() {
           <TabsTrigger value="customers">Customers</TabsTrigger>
           <TabsTrigger value="vendors">Vendors</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
-          <TabsTrigger value="database">All Reports</TabsTrigger>
+          <TabsTrigger value="database">Business Views</TabsTrigger>
         </TabsList>
         
         {/* Financial Reports */}
@@ -756,8 +756,8 @@ export default function Reports() {
         {/* Database views as individual reports */}
         <TabsContent value="database">
           <div className="mb-4">
-            <h2 className="text-xl font-bold">All Database Reports</h2>
-            <p className="text-gray-500">Complete collection of all available reports</p>
+            <h2 className="text-xl font-bold">Business Reports</h2>
+            <p className="text-gray-500">Complete collection of all business-related reports</p>
           </div>
           
           {schemaLoading ? (
@@ -767,10 +767,60 @@ export default function Reports() {
             </div>
           ) : (
             <div>
-              {schemaItems && schemaItems.filter(item => item.table_type === 'VIEW').length > 0 ? (
+              {schemaItems && schemaItems.filter(item => 
+                  item.table_type === 'VIEW' && 
+                  // Filter out PostgreSQL system tables and irrelevant views
+                  !item.table_name.startsWith('pg_') && 
+                  !item.table_name.includes('hypo') &&
+                  !item.table_name.includes('hidden') &&
+                  !item.table_name.includes('list') &&
+                  !item.table_name.includes('foreign') &&
+                  !item.table_name.includes('stat_') &&
+                  !item.table_name.includes('_stat') &&
+                  !item.table_schema.startsWith('pg_') &&
+                  !item.table_schema.startsWith('information_schema') &&
+                  (
+                    // Include only our business-specific views
+                    item.table_name.includes('customer') || 
+                    item.table_name.includes('vendor') || 
+                    item.table_name.includes('transaction') || 
+                    item.table_name.includes('deposit') || 
+                    item.table_name.includes('payment') || 
+                    item.table_name.includes('cheque') || 
+                    item.table_name.includes('balance') || 
+                    item.table_name.includes('profit') || 
+                    item.table_name.includes('report') ||
+                    item.table_name.includes('summary')
+                  )
+                ).length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {schemaItems
-                    .filter(item => item.table_type === 'VIEW')
+                    .filter(item => 
+                      item.table_type === 'VIEW' && 
+                      // Filter out PostgreSQL system tables and irrelevant views
+                      !item.table_name.startsWith('pg_') && 
+                      !item.table_name.includes('hypo') &&
+                      !item.table_name.includes('hidden') &&
+                      !item.table_name.includes('list') &&
+                      !item.table_name.includes('foreign') &&
+                      !item.table_name.includes('stat_') &&
+                      !item.table_name.includes('_stat') &&
+                      !item.table_schema.startsWith('pg_') &&
+                      !item.table_schema.startsWith('information_schema') &&
+                      (
+                        // Include only our business-specific views
+                        item.table_name.includes('customer') || 
+                        item.table_name.includes('vendor') || 
+                        item.table_name.includes('transaction') || 
+                        item.table_name.includes('deposit') || 
+                        item.table_name.includes('payment') || 
+                        item.table_name.includes('cheque') || 
+                        item.table_name.includes('balance') || 
+                        item.table_name.includes('profit') || 
+                        item.table_name.includes('report') ||
+                        item.table_name.includes('summary')
+                      )
+                    )
                     .map((view) => {
                       // Format the view name for display
                       const viewName = view.table_name;
