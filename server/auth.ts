@@ -189,6 +189,21 @@ export function setupAuth(app: Express): void {
       res.sendStatus(200);
     });
   });
+  
+  // Get current authenticated user
+  app.get("/api/user", (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    // Return user without password
+    const safeUser = {
+      ...req.user,
+      password: undefined
+    };
+    
+    return res.json(safeUser);
+  });
 
   // Create default superuser if needed
   createSuperuserIfNeeded();
