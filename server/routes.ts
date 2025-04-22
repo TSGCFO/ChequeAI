@@ -17,6 +17,7 @@ import { sendTelegramMessage } from "./services/telegram";
 import { generateAIResponse, processChequeDocument } from "./services/openai";
 import { setupAuth, requireAuth } from "./auth";
 import { registerUserRoutes } from "./user-routes";
+import { registerReportRoutes } from "./report-routes";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 
@@ -37,6 +38,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register user management routes
   registerUserRoutes(app, apiRouter);
+  
+  // Register report routes for database schema exploration
+  registerReportRoutes(app, apiRouter);
 
   // OpenAI client
   const openai = new OpenAI({
