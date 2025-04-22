@@ -78,6 +78,12 @@ export interface IStorage {
   createUserConversation(conversation: InsertUserConversation): Promise<UserConversation>;
   updateUserConversation(id: number, conversation: Partial<InsertUserConversation>): Promise<UserConversation | undefined>;
   deleteUserConversation(id: number): Promise<boolean>;
+  
+  // Telegram user methods
+  getTelegramUserByChatId(chatId: string): Promise<TelegramUser | undefined>;
+  createTelegramUser(telegramUser: InsertTelegramUser): Promise<TelegramUser>;
+  deleteTelegramUser(chatId: string): Promise<boolean>;
+  updateTelegramUserLastActive(chatId: string): Promise<TelegramUser | undefined>;
 }
 
 export class MemStorage implements IStorage {

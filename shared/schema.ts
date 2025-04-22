@@ -93,6 +93,16 @@ export const vendorPayments = pgTable("vendor_payments", {
   updated_at: timestamp("updated_at").defaultNow()
 });
 
+// Telegram Users Table
+export const telegramUsers = pgTable("telegram_users", {
+  id: serial("id").primaryKey(),
+  chat_id: varchar("chat_id", { length: 255 }).notNull().unique(),
+  user_id: integer("user_id").notNull().references(() => users.user_id),
+  last_active: timestamp("last_active").defaultNow(),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow()
+});
+
 // AI Assistant Messages
 export const aiMessages = pgTable("ai_messages", {
   message_id: serial("message_id").primaryKey(),
@@ -148,6 +158,14 @@ export const insertAIMessageSchema = createInsertSchema(aiMessages).omit({
   created_at: true
 });
 
+// Telegram user schema
+export const insertTelegramUserSchema = createInsertSchema(telegramUsers).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+  last_active: true
+});
+
 // User schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   user_id: true,
@@ -199,6 +217,7 @@ export type ChequeTransaction = typeof chequeTransactions.$inferSelect;
 export type CustomerDeposit = typeof customerDeposits.$inferSelect;
 export type VendorPayment = typeof vendorPayments.$inferSelect;
 export type AIMessage = typeof aiMessages.$inferSelect;
+export type TelegramUser = typeof telegramUsers.$inferSelect;
 
 // Create insert types
 export type InsertUser = Omit<z.infer<typeof insertUserSchema>, 'confirmPassword'>;
@@ -212,6 +231,7 @@ export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type InsertCustomerDeposit = z.infer<typeof insertCustomerDepositSchema>;
 export type InsertVendorPayment = z.infer<typeof insertVendorPaymentSchema>;
 export type InsertAIMessage = z.infer<typeof insertAIMessageSchema>;
+export type InsertTelegramUser = z.infer<typeof insertTelegramUserSchema>;
 
 // Create a type for transaction with customer and vendor details
 export type TransactionWithDetails = ChequeTransaction & {
