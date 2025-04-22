@@ -1,0 +1,112 @@
+2025-04-21 20:48:21.33
+6719d308
+User
+Processing image with OpenAI Vision API, data length: 200772 characters
+2025-04-21 20:50:04.03
+6719d308
+User
+Error creating transaction: error: invalid input syntax for type numeric: "$67,493.77"
+2025-04-21 20:50:04.03
+6719d308
+User
+at /home/runner/workspace/node_modules/pg-pool/index.js:45:11
+2025-04-21 20:50:04.03
+6719d308
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-04-21 20:50:04.03
+6719d308
+User
+at async file:///home/runner/workspace/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2025-04-21 20:50:04.03
+6719d308
+User
+at async DatabaseStorage.createTransaction (file:///home/runner/workspace/dist/index.js:379:22)
+2025-04-21 20:50:04.03
+6719d308
+User
+at async handleChequeProcessingCommand (file:///home/runner/workspace/dist/index.js:1247:31)
+2025-04-21 20:50:04.03
+6719d308
+User
+at async handleCommands (file:///home/runner/workspace/dist/index.js:1639:30)
+2025-04-21 20:50:04.03
+6719d308
+User
+at async generateAIResponse (file:///home/runner/workspace/dist/index.js:1889:29)
+2025-04-21 20:50:04.03
+6719d308
+User
+at async TelegramBot. (file:///home/runner/workspace/dist/index.js:2376:20) {
+2025-04-21 20:50:04.03
+6719d308
+User
+length: 151,
+2025-04-21 20:50:04.03
+6719d308
+User
+severity: 'ERROR',
+2025-04-21 20:50:04.03
+6719d308
+User
+code: '22P02',
+2025-04-21 20:50:04.03
+6719d308
+User
+detail: undefined,
+2025-04-21 20:50:04.03
+6719d308
+User
+hint: undefined,
+2025-04-21 20:50:04.03
+6719d308
+User
+position: undefined,
+2025-04-21 20:50:04.03
+6719d308
+User
+internalPosition: undefined,
+2025-04-21 20:50:04.03
+6719d308
+User
+internalQuery: undefined,
+2025-04-21 20:50:04.03
+6719d308
+User
+where: "unnamed portal parameter $4 = '...'",
+2025-04-21 20:50:04.03
+6719d308
+User
+schema: undefined,
+2025-04-21 20:50:04.03
+6719d308
+User
+table: undefined,
+2025-04-21 20:50:04.03
+6719d308
+User
+column: undefined,
+2025-04-21 20:50:04.03
+6719d308
+User
+dataType: undefined,
+2025-04-21 20:50:04.03
+6719d308
+User
+constraint: undefined,
+2025-04-21 20:50:04.03
+6719d308
+User
+file: 'numeric.c',
+2025-04-21 20:50:04.03
+6719d308
+User
+line: '6895',
+2025-04-21 20:50:04.03
+6719d308
+User
+routine: 'set_var_from_str'
+2025-04-21 20:50:04.03
+6719d308
+User
+}

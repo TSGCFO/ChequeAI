@@ -854,12 +854,16 @@ async function handleChequeProcessingCommand(
           };
         }
         
+        // Clean amount string by removing currency symbols, commas, etc.
+        const cleanAmount = amount.toString().replace(/[$,]/g, '');
+        
         const newTransaction: InsertTransaction = {
           customer_id: customerId,
           cheque_number: chequeNumber,
-          cheque_amount: amount.toString(),
+          cheque_amount: cleanAmount,
           vendor_id: vendorId,
-          date: new Date().toISOString().split('T')[0]
+          // Don't set a date - allow the database default to handle it
+          date: null
         };
 
         // Show transaction summary and ask for confirmation
