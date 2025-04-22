@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, Download, BarChart, PieChart, LineChart, TrendingUp, Users, Building, DollarSign, Flag, Database, TableIcon, FileText, Loader2 } from "lucide-react";
+import { Calendar, Download, BarChart, PieChart, LineChart, TrendingUp, Users, Building, DollarSign, Flag, Database, TableIcon, FileText, Loader2, Receipt, CreditCard, Wallet, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -349,7 +349,7 @@ export default function Reports() {
           <TabsTrigger value="customers">Customers</TabsTrigger>
           <TabsTrigger value="vendors">Vendors</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
-          <TabsTrigger value="database">Database Explorer</TabsTrigger>
+          <TabsTrigger value="database">All Reports</TabsTrigger>
         </TabsList>
         
         {/* Financial Reports */}
@@ -753,149 +753,161 @@ export default function Reports() {
           </Card>
         </TabsContent>
 
-        {/* Database Explorer */}
+        {/* Database views as individual reports */}
         <TabsContent value="database">
           <div className="mb-4">
-            <h2 className="text-xl font-bold">Database Explorer</h2>
-            <p className="text-gray-500">Browse and explore tables and views in the database</p>
+            <h2 className="text-xl font-bold">All Database Reports</h2>
+            <p className="text-gray-500">Complete collection of all available reports</p>
           </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Schema sidebar */}
-            <Card className="lg:col-span-4">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5" />
-                  Database Schema
-                </CardTitle>
-                <CardDescription>
-                  Select a table or view to explore its data
-                </CardDescription>
-                <div className="mt-2">
-                  <Input
-                    placeholder="Search tables and views..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="tables" value={schemaTab} onValueChange={setSchemaTab}>
-                  <TabsList className="mb-4 w-full">
-                    <TabsTrigger value="tables" className="flex-1">Tables</TabsTrigger>
-                    <TabsTrigger value="views" className="flex-1">Views</TabsTrigger>
-                    <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
-                  </TabsList>
-
-                  {schemaLoading ? (
-                    <div className="flex justify-center py-10">
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    </div>
-                  ) : (
-                    <div className="max-h-[500px] overflow-y-auto">
-                      {getFilteredSchemaItems().length === 0 ? (
-                        <div className="text-center py-6 text-muted-foreground">
-                          No {schemaTab === 'all' ? 'tables or views' : schemaTab} found matching "{searchTerm}"
-                        </div>
-                      ) : (
-                        <div className="space-y-1">
-                          {getFilteredSchemaItems().map((item) => (
-                            <Button
-                              key={`${item.table_schema}.${item.table_name}`}
-                              variant={selectedTable === `${item.table_schema}.${item.table_name}` ? 'default' : 'ghost'}
-                              className="w-full justify-start text-left"
+          
+          {schemaLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="ml-2">Loading all available reports...</span>
+            </div>
+          ) : (
+            <div>
+              {schemaItems && schemaItems.filter(item => item.table_type === 'VIEW').length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {schemaItems
+                    .filter(item => item.table_type === 'VIEW')
+                    .map((view) => {
+                      // Format the view name for display
+                      const viewName = view.table_name;
+                      const formattedName = viewName
+                        .split('_')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join(' ');
+                        
+                      // Get an appropriate icon based on the view name
+                      let ViewIcon = FileText;
+                      if (viewName.includes('customer')) ViewIcon = Users;
+                      if (viewName.includes('vendor')) ViewIcon = Building;
+                      if (viewName.includes('transaction')) ViewIcon = TableIcon;
+                      if (viewName.includes('profit')) ViewIcon = TrendingUp;
+                      if (viewName.includes('balance')) ViewIcon = DollarSign;
+                      if (viewName.includes('summary')) ViewIcon = BarChart;
+                      if (viewName.includes('payment')) ViewIcon = DollarSign;
+                      if (viewName.includes('deposit')) ViewIcon = DollarSign;
+                        
+                      return (
+                        <Card key={`${view.table_schema}.${view.table_name}`} className="overflow-hidden">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                              <ViewIcon className="h-5 w-5 text-primary" />
+                              {formattedName}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="pb-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full"
                               onClick={() => {
-                                setSelectedTable(`${item.table_schema}.${item.table_name}`);
+                                setSelectedTable(`${view.table_schema}.${view.table_name}`);
                                 setPage(1);
                               }}
                             >
-                              <div className="flex items-center gap-2 w-full">
-                                {item.table_type === 'BASE TABLE' ? <TableIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
-                                <span className="truncate flex-1">{item.table_name}</span>
-                                <Badge variant="outline" className="ml-auto text-xs">
-                                  {item.table_schema}
-                                </Badge>
-                              </div>
+                              View Report Data
                             </Button>
-                          ))}
-                        </div>
-                      )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground">No database views found.</p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Display selected report data */}
+          {selectedTable && (
+            <div className="mt-8">
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-primary" />
+                        {selectedTable.split('.')[1]
+                          .split('_')
+                          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                          .join(' ')}
+                      </CardTitle>
+                      <CardDescription>
+                        Detailed report data
+                      </CardDescription>
                     </div>
-                  )}
-                </Tabs>
-              </CardContent>
-            </Card>
-
-            {/* Table data view */}
-            <Card className="lg:col-span-8">
-              <CardHeader>
-                <CardTitle>
-                  {selectedTable ? (
                     <div className="flex items-center gap-2">
-                      <TableIcon className="h-5 w-5" />
-                      {selectedTable.split('.')[1]}
-                    </div>
-                  ) : (
-                    'Table Data'
-                  )}
-                </CardTitle>
-                {selectedTable && (
-                  <CardDescription>
-                    Viewing data from {selectedTable}
-                  </CardDescription>
-                )}
-                {tableData && (
-                  <div className="flex items-center justify-between mt-2">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="limit">Rows per page:</Label>
-                      <Select
-                        value={limit.toString()}
-                        onValueChange={(value) => {
-                          setLimit(parseInt(value));
-                          setPage(1);
-                        }}
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setSelectedTable(null)}
                       >
-                        <SelectTrigger id="limit" className="w-[100px]">
-                          <SelectValue placeholder="10" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="5">5</SelectItem>
-                          <SelectItem value="10">10</SelectItem>
-                          <SelectItem value="20">20</SelectItem>
-                          <SelectItem value="50">50</SelectItem>
-                          <SelectItem value="100">100</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {tableData.totalCount} total records
+                        <FileText className="h-4 w-4 mr-1" />
+                        Close Report
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleDownloadReport(selectedTable.split('.')[1])}
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Export
+                      </Button>
                     </div>
                   </div>
-                )}
-              </CardHeader>
-              <CardContent>
-                {!selectedTable ? (
-                  <div className="text-center py-10 text-muted-foreground">
-                    Select a table or view from the sidebar to view its data
-                  </div>
-                ) : tableLoading ? (
-                  <div className="flex justify-center py-10">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  </div>
-                ) : tableData ? (
-                  <>
-                    <div className="rounded-md border overflow-hidden">
-                      <div className="max-h-[500px] overflow-auto">
+                  
+                  {tableData && (
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-4 gap-2">
+                      <div className="text-sm text-muted-foreground">
+                        {tableData.totalCount} total records
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="report-limit">Rows per page:</Label>
+                        <Select
+                          value={limit.toString()}
+                          onValueChange={(value) => {
+                            setLimit(parseInt(value));
+                            setPage(1);
+                          }}
+                        >
+                          <SelectTrigger id="report-limit" className="w-[80px]">
+                            <SelectValue placeholder="10" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="5">5</SelectItem>
+                            <SelectItem value="10">10</SelectItem>
+                            <SelectItem value="20">20</SelectItem>
+                            <SelectItem value="50">50</SelectItem>
+                            <SelectItem value="100">100</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </CardHeader>
+                
+                <CardContent>
+                  {tableLoading ? (
+                    <div className="flex justify-center py-10">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <span className="ml-2">Loading report data...</span>
+                    </div>
+                  ) : tableData ? (
+                    <>
+                      <div className="rounded-md border overflow-hidden">
                         <Table>
                           <TableHeader>
                             <TableRow>
                               {tableData.columns.map((column) => (
-                                <TableHead key={column.column_name}>
-                                  {column.column_name}
-                                  <div className="text-xs text-muted-foreground font-normal">
-                                    {column.data_type} {column.is_nullable === 'YES' ? '(nullable)' : ''}
-                                  </div>
+                                <TableHead key={column.column_name} className="text-left whitespace-nowrap">
+                                  {column.column_name
+                                    .split('_')
+                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                    .join(' ')}
                                 </TableHead>
                               ))}
                             </TableRow>
@@ -907,14 +919,14 @@ export default function Reports() {
                                   colSpan={tableData.columns.length}
                                   className="h-24 text-center"
                                 >
-                                  No records found
+                                  No records found for this report
                                 </TableCell>
                               </TableRow>
                             ) : (
                               tableData.data.map((row, rowIndex) => (
                                 <TableRow key={rowIndex}>
                                   {tableData.columns.map((column) => (
-                                    <TableCell key={`${rowIndex}-${column.column_name}`}>
+                                    <TableCell key={`${rowIndex}-${column.column_name}`} className="whitespace-nowrap">
                                       {formatCellValue(row[column.column_name])}
                                     </TableCell>
                                   ))}
@@ -924,54 +936,54 @@ export default function Reports() {
                           </TableBody>
                         </Table>
                       </div>
-                    </div>
 
-                    {/* Pagination */}
-                    {tableData.totalCount > limit && (
-                      <Pagination className="mt-4">
-                        <PaginationContent>
-                          <PaginationItem>
-                            <PaginationPrevious
-                              onClick={() => page > 1 && setPage(page - 1)}
-                              className={page === 1 ? 'pointer-events-none opacity-50' : ''}
-                            />
-                          </PaginationItem>
-                          
-                          {generatePaginationItems(page, Math.ceil(tableData.totalCount / limit)).map((item, i) => (
-                            item === '...' ? (
-                              <PaginationItem key={`ellipsis-${i}`}>
-                                <PaginationEllipsis />
-                              </PaginationItem>
-                            ) : (
-                              <PaginationItem key={`page-${item}`}>
-                                <PaginationLink
-                                  isActive={page === item}
-                                  onClick={() => setPage(item as number)}
-                                >
-                                  {item}
-                                </PaginationLink>
-                              </PaginationItem>
-                            )
-                          ))}
-                          
-                          <PaginationItem>
-                            <PaginationNext
-                              onClick={() => page < Math.ceil(tableData.totalCount / limit) && setPage(page + 1)}
-                              className={page >= Math.ceil(tableData.totalCount / limit) ? 'pointer-events-none opacity-50' : ''}
-                            />
-                          </PaginationItem>
-                        </PaginationContent>
-                      </Pagination>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center py-10 text-muted-foreground">
-                    Failed to load data for {selectedTable}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                      {/* Pagination */}
+                      {tableData.totalCount > limit && (
+                        <Pagination className="mt-4">
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                onClick={() => page > 1 && setPage(page - 1)}
+                                className={page === 1 ? 'pointer-events-none opacity-50' : ''}
+                              />
+                            </PaginationItem>
+                            
+                            {generatePaginationItems(page, Math.ceil(tableData.totalCount / limit)).map((item, i) => (
+                              item === '...' ? (
+                                <PaginationItem key={`ellipsis-${i}`}>
+                                  <PaginationEllipsis />
+                                </PaginationItem>
+                              ) : (
+                                <PaginationItem key={`page-${item}`}>
+                                  <PaginationLink
+                                    isActive={page === item}
+                                    onClick={() => setPage(item as number)}
+                                  >
+                                    {item}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              )
+                            ))}
+                            
+                            <PaginationItem>
+                              <PaginationNext
+                                onClick={() => page < Math.ceil(tableData.totalCount / limit) && setPage(page + 1)}
+                                className={page >= Math.ceil(tableData.totalCount / limit) ? 'pointer-events-none opacity-50' : ''}
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-10 text-muted-foreground">
+                      Failed to load data for this report
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
