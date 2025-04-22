@@ -617,6 +617,101 @@ export default function Settings() {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
+                  
+                  {/* Edit User Dialog */}
+                  <Dialog open={isEditUserDialogOpen} onOpenChange={setIsEditUserDialogOpen}>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Edit User</DialogTitle>
+                        <DialogDescription>
+                          Update user information for {selectedUser?.username}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_first_name">First Name</Label>
+                            <Input
+                              id="edit_first_name"
+                              name="first_name"
+                              value={editUserForm.first_name}
+                              onChange={handleEditUserInputChange}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_last_name">Last Name</Label>
+                            <Input
+                              id="edit_last_name"
+                              name="last_name"
+                              value={editUserForm.last_name}
+                              onChange={handleEditUserInputChange}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="edit_email">Email</Label>
+                          <Input
+                            id="edit_email"
+                            name="email"
+                            type="email"
+                            value={editUserForm.email}
+                            onChange={handleEditUserInputChange}
+                          />
+                        </div>
+                        
+                        {/* Role selection (only for superusers) */}
+                        {isSuperuser && (
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_role">Role</Label>
+                            <Select 
+                              value={editUserForm.role} 
+                              onValueChange={(value: any) => handleEditUserRoleChange(value)}>
+                              <SelectTrigger id="edit_role">
+                                <SelectValue placeholder="Select a role" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="user">User</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="superuser">Superuser</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        
+                        {/* Active status toggle */}
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="edit_is_active">Active Account</Label>
+                          <Switch 
+                            id="edit_is_active" 
+                            checked={editUserForm.is_active} 
+                            onCheckedChange={handleEditUserStatusChange}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setIsEditUserDialogOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          type="submit" 
+                          onClick={handleEditUser}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Updating...
+                            </>
+                          ) : (
+                            "Update User"
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
@@ -678,7 +773,11 @@ export default function Settings() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end space-x-2">
-                                <Button variant="outline" size="icon">
+                                <Button 
+                                  variant="outline" 
+                                  size="icon"
+                                  onClick={() => handleStartEditUser(userItem)}
+                                >
                                   <Pencil className="h-4 w-4" />
                                 </Button>
                                 <Button 
