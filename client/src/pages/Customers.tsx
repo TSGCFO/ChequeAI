@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import useCustomers from "@/hooks/useCustomers";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
+import CustomerDepositDialog from "@/components/CustomerDepositDialog";
 
 const customerSchema = z.object({
   customer_name: z.string().min(2, "Name must be at least 2 characters"),
@@ -28,15 +29,18 @@ export default function Customers() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDepositDialogOpen, setIsDepositDialogOpen] = useState(false);
   const [currentCustomerId, setCurrentCustomerId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   
   const { toast } = useToast();
-  const { data: customers, isLoading, isError } = useCustomers();
+  const { data: customers = [], isLoading, isError } = useCustomers();
 
-  const filteredCustomers = customers?.filter(
+  // Cast to proper type to avoid TypeScript errors
+  const customersArray = customers as any[];
+  const filteredCustomers = Array.isArray(customersArray) ? customersArray.filter(
     (customer) => customer.customer_name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ) : [];
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerSchema),
