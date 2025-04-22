@@ -1,8 +1,10 @@
-import { Home, Users, Building, Settings, FileText, BarChart4 } from "lucide-react";
+import { Home, Users, Building, Settings, FileText, BarChart4, User } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Sidebar() {
   const [location] = useLocation();
+  const { user } = useAuth();
 
   const navItems = [
     { name: "Dashboard", icon: Home, path: "/" },
@@ -41,12 +43,19 @@ export default function Sidebar() {
         <div className="flex items-center">
           <div className="flex-shrink-0">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white">
-              <span className="text-xs font-medium">JD</span>
+              <span className="text-xs font-medium">
+                {user && (user.first_name?.[0] || '') + (user.last_name?.[0] || '')}
+                {!user && <User className="h-4 w-4" />}
+              </span>
             </div>
           </div>
           <div className="ml-3">
-            <p className="text-sm font-medium text-gray-900">John Doe</p>
-            <p className="text-xs text-gray-500">Administrator</p>
+            <p className="text-sm font-medium text-gray-900">
+              {user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username : 'Loading...'}
+            </p>
+            <p className="text-xs text-gray-500 capitalize">
+              {user?.role || ''}
+            </p>
           </div>
         </div>
       </div>
