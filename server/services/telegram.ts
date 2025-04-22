@@ -12,8 +12,6 @@ let bot: TelegramBot | null = null;
 const isDeployedEnvironment = process.env.REPLIT_DEPLOYMENT === 'true' || 
                              process.env.NODE_ENV === 'production';
 
-// Bot will automatically be enabled in production environments
-
 // Check if we should run the Telegram bot
 // IMPORTANT: In development, we keep it disabled by default to prevent polling conflicts
 // In production, we enable it by default unless explicitly disabled
@@ -25,31 +23,27 @@ const shouldRunTelegramBot = telegramToken &&
 if (shouldRunTelegramBot) {
   try {
     console.log("Initializing Telegram bot");
-    // Generate a unique session ID for this bot instance to prevent conflicts
-    const sessionId = `bot_session_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     
-    // Use the session ID and webhook mode in production to avoid polling conflicts
     if (isDeployedEnvironment) {
-      console.log(`Starting Telegram bot in deployed environment with session ID: ${sessionId}`);
-      // In production, use webhook mode if a webhook URL is provided, otherwise polling with session
+      console.log("Starting Telegram bot in deployed environment");
+      // In production, use webhook mode if a webhook URL is provided
       const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
       
       if (webhookUrl) {
         console.log(`Setting up Telegram bot with webhook: ${webhookUrl}`);
-        bot = new TelegramBot(telegramToken, { 
-          polling: false,
-        });
+        bot = new TelegramBot(telegramToken, { polling: false });
         // Set webhook
         bot.setWebHook(webhookUrl).then(() => {
           console.log('Webhook set successfully');
         }).catch(err => {
           console.error('Failed to set webhook:', err);
-          // Fall back to polling with session ID if webhook fails
-          // Fallback to polling with session ID
+          // Fall back to simple polling if webhook fails
+          console.log('Webhook setup failed, falling back to simple polling');
           bot = new TelegramBot(telegramToken, { polling: true });
         });
       } else {
-        // No webhook URL, use polling
+        // No webhook URL, use simple polling
+        console.log('Using simple polling in production');
         bot = new TelegramBot(telegramToken, { polling: true });
       }
     } else {
@@ -80,34 +74,38 @@ function setupBot() {
   // Welcome message for new users
   bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    bot.sendMessage(
-      chatId,
-      "Welcome to Cheque Ledger Pro! I'm your AI assistant. You can ask me about your transactions, customers, vendors, and more.\n\nYou can use both slash commands like \"/modify transaction\" or natural language like \"modify the amount of cheque 12345\".\n\nType /help to see all available commands and examples."
-    );
+    if (bot) {
+      bot.sendMessage(
+        chatId,
+        "Welcome to Cheque Ledger Pro! I'm your AI assistant. You can ask me about your transactions, customers, vendors, and more.\n\nYou can use both slash commands like \"/modify transaction\" or natural language like \"modify the amount of cheque 12345\".\n\nType /help to see all available commands and examples."
+      );
+    }
   });
   
   // Help command
   bot.onText(/\/help/, (msg) => {
     const chatId = msg.chat.id;
-    bot.sendMessage(
-      chatId,
-      "I'm your AI assistant for Cheque Ledger Pro. You can use both slash commands and natural language.\n\n" +
-      "Available commands:\n" +
-      "/start - Start the bot\n" +
-      "/help - Show this help message\n" +
-      "/new transaction - Create a new transaction\n" +
-      "/deposit - Create a new customer deposit\n" +
-      "/modify transaction - Modify an existing transaction\n" +
-      "/find transaction - Find transaction details\n" +
-      "/summary - Get a business summary\n\n" +
-      "You can also use natural language like:\n" +
-      "- \"create a new transaction\"\n" +
-      "- \"make a new deposit\"\n" +
-      "- \"modify cheque number 00010572\"\n" +
-      "- \"change the amount of cheque 12345\"\n" +
-      "- \"what's my business summary?\"\n\n" +
-      "For general questions, just ask about transactions, customers, vendors, or business metrics."
-    );
+    if (bot) {
+      bot.sendMessage(
+        chatId,
+        "I'm your AI assistant for Cheque Ledger Pro. You can use both slash commands and natural language.\n\n" +
+        "Available commands:\n" +
+        "/start - Start the bot\n" +
+        "/help - Show this help message\n" +
+        "/new transaction - Create a new transaction\n" +
+        "/deposit - Create a new customer deposit\n" +
+        "/modify transaction - Modify an existing transaction\n" +
+        "/find transaction - Find transaction details\n" +
+        "/summary - Get a business summary\n\n" +
+        "You can also use natural language like:\n" +
+        "- \"create a new transaction\"\n" +
+        "- \"make a new deposit\"\n" +
+        "- \"modify cheque number 00010572\"\n" +
+        "- \"change the amount of cheque 12345\"\n" +
+        "- \"what's my business summary?\"\n\n" +
+        "For general questions, just ask about transactions, customers, vendors, or business metrics."
+      );
+    }
   });
   
   // Special handlers for specific commands
@@ -123,6 +121,8 @@ function setupBot() {
     if (msg.text === "/start" || msg.text === "/help") return;
     
     try {
+      if (!bot) return;
+      
       // Show typing indicator
       bot.sendChatAction(chatId, "typing");
       
@@ -243,10 +243,12 @@ function setupBot() {
       bot.sendMessage(chatId, response);
     } catch (error) {
       console.error("Error generating response for Telegram:", error);
-      bot.sendMessage(
-        chatId,
-        "Sorry, I encountered an error processing your request. Please try again later."
-      );
+      if (bot) {
+        bot.sendMessage(
+          chatId,
+          "Sorry, I encountered an error processing your request. Please try again later."
+        );
+      }
     }
   });
   
