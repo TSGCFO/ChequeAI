@@ -2263,3 +2263,8 @@ export async function processImage(imageBase64: string) {
     throw error;
   }
 }
+/**
+ * Helper function to find a customer by name or ID
+ * @param customerInput The customer name or ID entered by the user
+ * @returns The customer object if found, undefined otherwise
+ */

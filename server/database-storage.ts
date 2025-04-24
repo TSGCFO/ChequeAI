@@ -1,21 +1,35 @@
 import { 
   customers, vendors, chequeTransactions,
   customerDeposits, vendorPayments, aiMessages,
-  users, userConversations,
+  users, userConversations, telegramUsers,
   type Customer, type Vendor, type ChequeTransaction, 
   type CustomerDeposit, type VendorPayment, type AIMessage,
-  type User, type UserConversation,
+  type User, type UserConversation, type TelegramUser,
   type InsertCustomer, type InsertVendor, type InsertTransaction, 
   type InsertCustomerDeposit, type InsertVendorPayment, type InsertAIMessage,
-  type InsertUser, type InsertUserConversation, type UpdateUser,
+  type InsertUser, type InsertUserConversation, type UpdateUser, type InsertTelegramUser,
   type TransactionWithDetails, type BusinessSummary
 } from "@shared/schema";
 
 import { db } from "./db";
+import { pool } from "./db";
 import { eq, and, desc, sql, count, sum } from "drizzle-orm";
 import { IStorage } from "./storage";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
 
 export class DatabaseStorage implements IStorage {
+  // Initialize session store using PostgreSQL
+  sessionStore: session.Store;
+  
+  constructor() {
+    const PostgresStore = connectPg(session);
+    this.sessionStore = new PostgresStore({
+      pool,
+      tableName: 'session', // Default table name
+      createTableIfMissing: true // Automatically create the sessions table if it doesn't exist
+    });
+  }
   // Transaction methods
   async getTransactions(options?: {
     limit?: number;

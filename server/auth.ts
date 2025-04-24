@@ -97,7 +97,8 @@ export function setupAuth(app: Express): void {
     cookie: {
       secure: process.env.NODE_ENV === "production",
       maxAge: 1000 * 60 * 60 * 24 // 24 hours
-    }
+    },
+    store: storage.sessionStore // Use the storage interface's session store
   };
 
   app.use(session(sessionSettings));

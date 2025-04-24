@@ -15,10 +15,16 @@ import {
   type InsertUser,
   type UpdateUser,
   type UserConversation,
-  type InsertUserConversation
+  type InsertUserConversation,
+  type TelegramUser,
+  type InsertTelegramUser
 } from "@shared/schema";
+import session from "express-session";
 
 export interface IStorage {
+  // Session store
+  sessionStore: session.Store;
+  
   // Transaction methods
   getTransactions(options?: {
     limit?: number;
