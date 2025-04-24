@@ -140,12 +140,11 @@ export function setupAuth(app: Express): void {
           return done(null, false, { message: "Incorrect password" });
         }
         
-        // Update last login time - use appropriate field for the schema
+        // Update last login timestamp
         if (user.user_id) {
+          // Only set is_active flag, as updated_at is handled by the database
           await storage.updateUser(user.user_id, {
-            // Ensure this matches the actual schema
-            is_active: true, // Keep the user active
-            updated_at: new Date() // Update the timestamp
+            is_active: true // Keep the user active
           });
         }
         
@@ -229,19 +228,19 @@ export function setupAuth(app: Express): void {
 /**
  * Middleware to require authentication
  */
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export function requireAuth(req: Request, res: Response, next: NextFunction): any {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Authentication required" });
   }
-  next();
+  return next();
 }
 
 /**
  * Middleware to require specific role
  * @param roles Array of allowed roles
  */
-export function requireRole(roles: (typeof userRoleEnum.enumValues)[number][]): (req: Request, res: Response, next: NextFunction) => void {
-  return (req: Request, res: Response, next: NextFunction): void => {
+export function requireRole(roles: (typeof userRoleEnum.enumValues)[number][]): (req: Request, res: Response, next: NextFunction) => any {
+  return (req: Request, res: Response, next: NextFunction): any => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
     }
@@ -252,6 +251,6 @@ export function requireRole(roles: (typeof userRoleEnum.enumValues)[number][]): 
       return res.status(403).json({ message: "Insufficient permissions" });
     }
     
-    next();
+    return next();
   };
 }
