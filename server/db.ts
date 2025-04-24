@@ -1,10 +1,7 @@
 import * as schema from "@shared/schema";
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from 'ws';
-
-// Configure Neon for WebSocket connection (needed for serverless environments)
-neonConfig.webSocketConstructor = ws;
+import pkg from 'pg';
+const { Pool } = pkg;
+import { drizzle } from 'drizzle-orm/node-postgres';
 
 // Use Replit PostgreSQL database
 const databaseUrl = process.env.DATABASE_URL;

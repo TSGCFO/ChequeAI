@@ -5,12 +5,12 @@
 import pkg from 'pg';
 const { Pool } = pkg;
 
-// Use Supabase database
-const databaseUrl = process.env.SUPABASE_DATABASE_URL;
+// Use Replit PostgreSQL database
+const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
   throw new Error(
-    "SUPABASE_DATABASE_URL must be set. Please provide a valid Supabase connection string.",
+    "DATABASE_URL must be set. Did you forget to provision a database?",
   );
 }
 
@@ -18,7 +18,7 @@ console.log("Connecting to database using node-postgres directly...");
 export const pool = new Pool({ 
   connectionString: databaseUrl,
   ssl: {
-    rejectUnauthorized: false // Required for Supabase connection
+    rejectUnauthorized: false // Required for most hosted PostgreSQL providers
   }
 });
 
