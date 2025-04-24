@@ -1,24 +1,23 @@
-import * as schema from "@shared/schema";
-import pkg from 'pg';
-const { Pool } = pkg;
+import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import * as schema from "@shared/schema";
 
-// Use Replit PostgreSQL database
-const databaseUrl = process.env.DATABASE_URL;
+const { Pool } = pg;
+
+// Use Supabase database
+const databaseUrl = process.env.SUPABASE_DATABASE_URL;
 
 if (!databaseUrl) {
   throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
+    "SUPABASE_DATABASE_URL must be set. Please provide a valid Supabase connection string.",
   );
 }
 
 console.log("Connecting to database using node-postgres...");
-
-// Create the connection pool
 export const pool = new Pool({ 
   connectionString: databaseUrl,
   ssl: {
-    rejectUnauthorized: false // Required for most hosted PostgreSQL providers
+    rejectUnauthorized: false // Required for Supabase connection
   }
 });
 
@@ -31,5 +30,4 @@ pool.query('SELECT NOW()', (err, res) => {
   }
 });
 
-// Create the Drizzle ORM instance
 export const db = drizzle(pool, { schema });

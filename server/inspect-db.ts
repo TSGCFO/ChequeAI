@@ -1,66 +1,71 @@
-import { db, pool } from './db';
-import { sql } from 'drizzle-orm';
+/**
+ * This script inspects the database schema to help us understand the structure
+ */
+import { pool } from './direct-db';
 
-async function main() {
-  console.log("Inspecting database schema...");
-  
+async function inspectDatabase() {
   try {
-    // Check PostgreSQL version
-    const versionResult = await db.execute(sql`SELECT version()`);
-    console.log("PostgreSQL Version:", versionResult.rows[0].version);
-    
-    // List all tables in the public schema
-    const tablesResult = await db.execute(sql`
-      SELECT table_name 
-      FROM information_schema.tables 
+    console.log("Inspecting database schema...");
+
+    // List all tables in the database
+    const tablesQuery = `
+      SELECT table_name
+      FROM information_schema.tables
       WHERE table_schema = 'public'
-      ORDER BY table_name
-    `);
+      ORDER BY table_name;
+    `;
     
-    console.log("\nTables in the database:");
-    tablesResult.rows.forEach((row: any) => {
-      console.log(`- ${row.table_name}`);
+    const tablesResult = await pool.query(tablesQuery);
+    console.log("Tables in the database:");
+    tablesResult.rows.forEach((row, index) => {
+      console.log(`${index + 1}. ${row.table_name}`);
     });
-    
-    // List all enums in the database
-    const enumsResult = await db.execute(sql`
-      SELECT pg_type.typname, pg_enum.enumlabel
-      FROM pg_type 
-      JOIN pg_enum ON pg_enum.enumtypid = pg_type.oid
-      ORDER BY pg_type.typname, pg_enum.enumsortorder
-    `);
-    
-    // Group enum values by enum name
-    const enums = enumsResult.rows.reduce((acc: any, row: any) => {
-      if (!acc[row.typname]) {
-        acc[row.typname] = [];
-      }
-      acc[row.typname].push(row.enumlabel);
-      return acc;
-    }, {});
-    
-    console.log("\nEnums in the database:");
-    Object.entries(enums).forEach(([name, values]) => {
-      console.log(`- ${name}: ${(values as string[]).join(', ')}`);
-    });
-    
-    // Count rows in each table
-    console.log("\nRow counts in each table:");
-    for (const row of tablesResult.rows) {
-      const tableName = row.table_name;
-      if (tableName === 'session') continue; // Skip session table
+    console.log();
+
+    // For each table, list its columns
+    for (const tableRow of tablesResult.rows) {
+      const tableName = tableRow.table_name;
       
-      const countResult = await db.execute(sql`
-        SELECT COUNT(*) as count FROM ${sql.identifier(tableName)}
-      `);
-      console.log(`- ${tableName}: ${countResult.rows[0].count} rows`);
+      const columnsQuery = `
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = $1
+        ORDER BY ordinal_position;
+      `;
+      
+      const columnsResult = await pool.query(columnsQuery, [tableName]);
+      console.log(`Table: ${tableName}`);
+      console.log("Columns:");
+      columnsResult.rows.forEach(col => {
+        console.log(`  - ${col.column_name} (${col.data_type}, ${col.is_nullable === 'YES' ? 'nullable' : 'not nullable'})`);
+      });
+      
+      // Get primary key information
+      const pkQuery = `
+        SELECT a.attname as column_name
+        FROM pg_index i
+        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+        WHERE i.indrelid = $1::regclass AND i.indisprimary;
+      `;
+      
+      const pkResult = await pool.query(pkQuery, [`public.${tableName}`]);
+      if (pkResult.rows.length > 0) {
+        console.log("Primary key:", pkResult.rows.map(row => row.column_name).join(', '));
+      } else {
+        console.log("No primary key defined");
+      }
+      
+      console.log();
     }
-    
+
+    console.log("Database inspection complete");
   } catch (error) {
     console.error("Error inspecting database:", error);
   } finally {
+    // Close the connection pool
     await pool.end();
   }
 }
 
-main();
+// Execute the inspection
+inspectDatabase();
