@@ -20,6 +20,7 @@ import {
   type InsertTelegramUser
 } from "@shared/schema";
 import session from "express-session";
+import createMemoryStore from "memorystore";
 
 export interface IStorage {
   // Session store
@@ -99,11 +100,15 @@ export class MemStorage implements IStorage {
   private aiMessages: AIMessage[];
   private users: Map<number, User>;
   private userConversations: Map<number, UserConversation>;
+  private telegramUsers: Map<string, TelegramUser>;
   private nextTransactionId: number;
   private nextCustomerId: number;
   private nextMessageId: number;
   private nextUserId: number;
   private nextConversationId: number;
+  
+  // Session store for memory storage
+  sessionStore: session.Store;
   
   constructor() {
     this.transactions = new Map();
@@ -112,11 +117,18 @@ export class MemStorage implements IStorage {
     this.aiMessages = [];
     this.users = new Map();
     this.userConversations = new Map();
+    this.telegramUsers = new Map();
     this.nextTransactionId = 1;
     this.nextCustomerId = 1;
     this.nextMessageId = 1;
     this.nextUserId = 1;
     this.nextConversationId = 1;
+    
+    // Create memory store for session data (not for production)
+    const MemoryStore = createMemoryStore(session);
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000, // 24 hours in milliseconds
+    });
     
     // Add sample data
     this.initializeSampleData();
@@ -903,6 +915,42 @@ export class MemStorage implements IStorage {
 
   async deleteUserConversation(id: number): Promise<boolean> {
     return this.userConversations.delete(id);
+  }
+  
+  // Telegram user methods
+  async getTelegramUserByChatId(chatId: string): Promise<TelegramUser | undefined> {
+    return this.telegramUsers.get(chatId);
+  }
+
+  async createTelegramUser(telegramUser: InsertTelegramUser): Promise<TelegramUser> {
+    const newTelegramUser: TelegramUser = {
+      ...telegramUser,
+      created_at: new Date(),
+      last_active: new Date()
+    };
+    
+    this.telegramUsers.set(telegramUser.chat_id, newTelegramUser);
+    return newTelegramUser;
+  }
+
+  async deleteTelegramUser(chatId: string): Promise<boolean> {
+    return this.telegramUsers.delete(chatId);
+  }
+
+  async updateTelegramUserLastActive(chatId: string): Promise<TelegramUser | undefined> {
+    const telegramUser = this.telegramUsers.get(chatId);
+    
+    if (!telegramUser) {
+      return undefined;
+    }
+    
+    const updatedTelegramUser = {
+      ...telegramUser,
+      last_active: new Date()
+    };
+    
+    this.telegramUsers.set(chatId, updatedTelegramUser);
+    return updatedTelegramUser;
   }
 }
 

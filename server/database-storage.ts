@@ -558,4 +558,62 @@ export class DatabaseStorage implements IStorage {
       return false;
     }
   }
+
+  // Telegram user methods
+  async getTelegramUserByChatId(chatId: string): Promise<TelegramUser | undefined> {
+    try {
+      const [telegramUser] = await db
+        .select()
+        .from(telegramUsers)
+        .where(eq(telegramUsers.chat_id, chatId));
+      
+      return telegramUser;
+    } catch (error) {
+      console.error("Error getting Telegram user:", error);
+      return undefined;
+    }
+  }
+  
+  async createTelegramUser(telegramUser: InsertTelegramUser): Promise<TelegramUser> {
+    try {
+      const [result] = await db
+        .insert(telegramUsers)
+        .values(telegramUser)
+        .returning();
+      
+      return result;
+    } catch (error) {
+      console.error("Error creating Telegram user:", error);
+      throw error;
+    }
+  }
+  
+  async deleteTelegramUser(chatId: string): Promise<boolean> {
+    try {
+      const result = await db
+        .delete(telegramUsers)
+        .where(eq(telegramUsers.chat_id, chatId))
+        .returning();
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error("Error deleting Telegram user:", error);
+      return false;
+    }
+  }
+  
+  async updateTelegramUserLastActive(chatId: string): Promise<TelegramUser | undefined> {
+    try {
+      const [result] = await db
+        .update(telegramUsers)
+        .set({ last_active: new Date() })
+        .where(eq(telegramUsers.chat_id, chatId))
+        .returning();
+      
+      return result;
+    } catch (error) {
+      console.error("Error updating Telegram user last active:", error);
+      return undefined;
+    }
+  }
 }

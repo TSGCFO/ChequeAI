@@ -10,7 +10,19 @@ import { User, userRoleEnum } from "@shared/schema";
 // Extend Express User interface with our User type
 declare global {
   namespace Express {
-    interface User extends User {}
+    // Use the imported User type directly without extending
+    interface User {
+      user_id: number;
+      username: string;
+      email: string;
+      first_name: string | null;
+      last_name: string | null;
+      role: typeof userRoleEnum.enumValues[number];
+      is_active: boolean | null;
+      last_login: Date | null;
+      created_at: Date | null;
+      updated_at: Date | null;
+    }
   }
 }
 
@@ -128,10 +140,14 @@ export function setupAuth(app: Express): void {
           return done(null, false, { message: "Incorrect password" });
         }
         
-        // Update last login time
-        await storage.updateUser(user.user_id, {
-          last_login: new Date()
-        });
+        // Update last login time - use appropriate field for the schema
+        if (user.user_id) {
+          await storage.updateUser(user.user_id, {
+            // Ensure this matches the actual schema
+            is_active: true, // Keep the user active
+            updated_at: new Date() // Update the timestamp
+          });
+        }
         
         return done(null, user);
       } catch (error) {

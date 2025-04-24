@@ -49,6 +49,9 @@ export const vendors = pgTable("vendors", {
   updated_at: timestamp("updated_at").defaultNow()
 });
 
+// Define transaction status enum
+export const transactionStatusEnum = pgEnum('transaction_status', ['pending', 'completed', 'cancelled']);
+
 // Transactions Table
 export const chequeTransactions = pgTable("cheque_transactions", {
   transaction_id: integer("transaction_id").primaryKey(),
@@ -65,6 +68,7 @@ export const chequeTransactions = pgTable("cheque_transactions", {
   paid_to_customer: numeric("paid_to_customer", { precision: 10, scale: 2 }).default("0"),
   received_from_vendor: numeric("received_from_vendor", { precision: 10, scale: 2 }).default("0"),
   profit_withdrawn: numeric("profit_withdrawn", { precision: 10, scale: 2 }).default("0"),
+  status: transactionStatusEnum("status").default('pending'),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow()
 });
