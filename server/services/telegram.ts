@@ -67,24 +67,154 @@ if (shouldRunTelegramBot) {
 /**
  * Set up message handlers for the Telegram bot
  */
+// Track login state per chat
+const loginStates: Map<string, {
+  state: 'need_username' | 'need_password' | 'authenticated';
+  username?: string;
+  userId?: number;
+}> = new Map();
+
+// Check if a user is authenticated with the Telegram bot
+async function isAuthenticated(chatId: string): Promise<boolean> {
+  try {
+    // Check if we already have a telegram user with this chat ID
+    const telegramUser = await storage.getTelegramUserByChatId(chatId);
+    if (telegramUser) {
+      // Update last active timestamp
+      await storage.updateTelegramUserLastActive(chatId);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("Error checking Telegram user authentication:", error);
+    return false;
+  }
+}
+
+// Process authentication for Telegram users
+async function processAuthentication(chatId: string, text: string): Promise<string> {
+  // Check if we're in the middle of authentication
+  let state = loginStates.get(chatId);
+  
+  if (!state) {
+    // If no state exists, start authentication process
+    loginStates.set(chatId, { state: 'need_username' });
+    return "Please enter your username to login:";
+  }
+  
+  if (state.state === 'need_username') {
+    // Process username
+    const username = text.trim();
+    const user = await storage.getUserByUsername(username);
+    
+    if (!user) {
+      return "Username not found. Please enter a valid username:";
+    }
+    
+    // Update state
+    loginStates.set(chatId, { 
+      state: 'need_password', 
+      username: username
+    });
+    
+    return "Please enter your password:";
+  }
+  
+  if (state.state === 'need_password' && state.username) {
+    // Process password
+    const password = text.trim();
+    
+    // Import auth functions for password verification
+    const { comparePasswords } = await import('../auth');
+    
+    // Get user
+    const user = await storage.getUserByUsername(state.username);
+    if (!user) {
+      loginStates.delete(chatId);
+      return "Authentication failed. Please try again. Type /login to start the process.";
+    }
+    
+    // Check password
+    const passwordMatch = await comparePasswords(password, user.password);
+    if (!passwordMatch) {
+      return "Incorrect password. Please try again:";
+    }
+    
+    // Password match, create telegram user record
+    try {
+      await storage.createTelegramUser({
+        chat_id: chatId,
+        user_id: user.user_id
+      });
+      
+      // Update state to authenticated
+      loginStates.set(chatId, { 
+        state: 'authenticated',
+        username: state.username,
+        userId: user.user_id
+      });
+      
+      return `Authentication successful! Welcome ${user.first_name || user.username}. You can now use all bot commands.`;
+    } catch (error) {
+      console.error("Error creating telegram user:", error);
+      return "Failed to complete authentication. Please try again later.";
+    }
+  }
+  
+  return "Authentication error. Please try again. Type /login to start the process.";
+}
+
 function setupBot() {
   if (!bot) return;
   
   // Welcome message for new users
-  bot.onText(/\/start/, (msg) => {
-    const chatId = msg.chat.id;
+  bot.onText(/\/start/, async (msg) => {
+    const chatId = msg.chat.id.toString();
     if (bot) {
-      bot.sendMessage(
-        chatId,
-        "Welcome to Cheque Ledger Pro! I'm your AI assistant. You can ask me about your transactions, customers, vendors, and more.\n\nYou can use both slash commands like \"/modify transaction\" or natural language like \"modify the amount of cheque 12345\".\n\nType /help to see all available commands and examples."
-      );
+      const authenticated = await isAuthenticated(chatId);
+      
+      let welcomeMessage = "Welcome to Cheque Ledger Pro! I'm your AI assistant.";
+      
+      if (!authenticated) {
+        welcomeMessage += " You need to login first to use this bot. Type /login to authenticate.";
+      } else {
+        welcomeMessage += " You're already authenticated and can use all features!\n\nYou can use both slash commands like \"/modify transaction\" or natural language like \"modify the amount of cheque 12345\".\n\nType /help to see all available commands and examples.";
+      }
+      
+      bot.sendMessage(chatId, welcomeMessage);
+    }
+  });
+  
+  // Login command
+  bot.onText(/\/login/, async (msg) => {
+    const chatId = msg.chat.id.toString();
+    if (bot) {
+      const authenticated = await isAuthenticated(chatId);
+      
+      if (authenticated) {
+        bot.sendMessage(chatId, "You're already logged in!");
+      } else {
+        // Start login process
+        loginStates.set(chatId, { state: 'need_username' });
+        bot.sendMessage(chatId, "Please enter your username:");
+      }
     }
   });
   
   // Help command
-  bot.onText(/\/help/, (msg) => {
-    const chatId = msg.chat.id;
+  bot.onText(/\/help/, async (msg) => {
+    const chatId = msg.chat.id.toString();
     if (bot) {
+      const authenticated = await isAuthenticated(chatId);
+      
+      if (!authenticated) {
+        bot.sendMessage(
+          chatId,
+          "You need to login first to use all features. Type /login to authenticate."
+        );
+        return;
+      }
+      
       bot.sendMessage(
         chatId,
         "I'm your AI assistant for Cheque Ledger Pro. You can use both slash commands and natural language.\n\n" +
@@ -108,22 +238,44 @@ function setupBot() {
   });
   
   // Special handlers for specific commands
-  bot.onText(/^\/(start|help)$/, (msg) => {
+  bot.onText(/^\/(start|help|login)$/, (msg) => {
     // Don't do anything here, as these commands are handled by specific handlers above
   });
 
   // Handle all other text messages, including other commands
   bot.on("message", async (msg) => {
-    const chatId = msg.chat.id;
+    const chatId = msg.chat.id.toString();
     
-    // Skip start and help commands (they have specific handlers)
-    if (msg.text === "/start" || msg.text === "/help") return;
+    // Skip start, help, and login commands (they have specific handlers)
+    if (msg.text === "/start" || msg.text === "/help" || msg.text === "/login") return;
     
     try {
       if (!bot) return;
       
       // Show typing indicator
       bot.sendChatAction(chatId, "typing");
+      
+      // Check authentication
+      const authenticated = await isAuthenticated(chatId);
+      
+      // Check if user is in the login process
+      const loginState = loginStates.get(chatId);
+      if (loginState && loginState.state !== 'authenticated') {
+        if (msg.text) {
+          const response = await processAuthentication(chatId, msg.text);
+          bot.sendMessage(chatId, response);
+        }
+        return;
+      }
+      
+      // Require authentication for all other commands
+      if (!authenticated) {
+        bot.sendMessage(
+          chatId,
+          "You need to login first to use this feature. Type /login to authenticate."
+        );
+        return;
+      }
       
       const conversationId = `telegram-${chatId}`;
       let response: string;
