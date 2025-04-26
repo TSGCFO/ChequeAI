@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import express, { type Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
@@ -642,6 +642,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error sending Telegram message:", error);
       res.status(500).json({ message: "Failed to send Telegram message" });
+    }
+  });
+  
+  // Telegram webhook endpoint for production deployments
+  app.post('/telegram-webhook', express.json(), (req, res) => {
+    // Pass the update to the bot API
+    if (process.env.TELEGRAM_BOT_TOKEN) {
+      try {
+        // Import needed only in this route to avoid initialization conflicts
+        const { handleWebhookUpdate } = require('./services/telegram');
+        handleWebhookUpdate(req.body);
+        res.sendStatus(200);
+      } catch (error) {
+        console.error('Error handling Telegram webhook:', error);
+        res.sendStatus(500);
+      }
+    } else {
+      console.log('Telegram webhook received but no token is configured');
+      res.sendStatus(404);
     }
   });
 

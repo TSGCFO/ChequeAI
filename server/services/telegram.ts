@@ -8,6 +8,15 @@ const telegramToken = process.env.TELEGRAM_BOT_TOKEN || "";
 // Initialize the bot
 let bot: TelegramBot | null = null;
 
+// Max number of reconnection attempts
+const MAX_RECONNECT_ATTEMPTS = 10;
+// Current reconnection attempt counter
+let reconnectAttempts = 0;
+// Reconnection delay in ms (starts at 5 seconds, doubles each time)
+let reconnectDelay = 5000;
+// Flag to track if we're in the middle of a reconnection
+let isReconnecting = false;
+
 // Check if we're in a deployed environment
 // This checks both Replit's deployment flag and if we're running on a production server
 const isDeployedEnvironment = process.env.REPLIT_DEPLOYMENT === 'true' || 
@@ -38,19 +47,95 @@ if (shouldRunTelegramBot) {
           console.error('Failed to set webhook:', err);
           // Fall back to simple polling if webhook fails
           console.log('Webhook setup failed, falling back to simple polling');
-          bot = new TelegramBot(telegramToken, { polling: true });
+          bot = new TelegramBot(telegramToken, {
+            polling: true,
+            // Add error handling for polling
+            onlyFirstMatch: true,
+            request: {
+              // Increase timeout to handle slow connections
+              timeout: 60000,
+              // Add automatic retry
+              agent: false
+            }
+          });
+          
+          // Register error handler for polling errors
+          bot.on('polling_error', (error) => {
+            console.error('Telegram polling error:', error);
+            
+            // Attempt to reconnect
+            if (!isReconnecting) {
+              reconnectBot();
+            }
+          });
         });
       } else {
         // No webhook URL, use simple polling
         console.log('Using simple polling in production');
-        bot = new TelegramBot(telegramToken, { polling: true });
+        bot = new TelegramBot(telegramToken, {
+          polling: true,
+          // Add error handling for polling
+          onlyFirstMatch: true,
+          request: {
+            // Increase timeout to handle slow connections
+            timeout: 60000,
+            // Add automatic retry
+            agent: false
+          }
+        });
+        
+        // Register error handler for polling errors
+        bot.on('polling_error', (error) => {
+          console.error('Telegram polling error:', error);
+          
+          // Attempt to reconnect
+          if (!isReconnecting) {
+            reconnectBot();
+          }
+        });
       }
     } else {
       // In development, use simple polling
       console.log('Starting Telegram bot in development mode');
-      bot = new TelegramBot(telegramToken, { polling: true });
+      bot = new TelegramBot(telegramToken, {
+        polling: true,
+        // Add error handling for polling
+        onlyFirstMatch: true,
+        request: {
+          // Increase timeout to handle slow connections
+          timeout: 60000,
+          // Add automatic retry
+          agent: false
+        }
+      });
+      
+      // Register error handler for polling errors
+      bot.on('polling_error', (error) => {
+        console.error('Telegram polling error:', error);
+        
+        // Attempt to reconnect
+        if (!isReconnecting) {
+          reconnectBot();
+        }
+      });
     }
     setupBot();
+    
+    // Add process exit handlers to gracefully close the bot
+    process.on('SIGINT', () => {
+      console.log('SIGINT received, closing Telegram bot');
+      if (bot) {
+        bot.close();
+      }
+    });
+    
+    process.on('SIGTERM', () => {
+      console.log('SIGTERM received, closing Telegram bot');
+      if (bot) {
+        bot.close();
+      }
+    });
+    
   } catch (error) {
     console.error("Error initializing Telegram bot:", error);
   }
@@ -93,7 +178,7 @@ async function isAuthenticated(chatId: string): Promise<boolean> {
       loginStates.set(chatId, { 
         state: 'authenticated',
         username: telegramUser.username || '',
-        userId: 0  // We don't have user_id in the new schema, but we keep the property
+        userId: telegramUser.user_id  // Use the linked web user ID
       });
       
       return true;
@@ -425,6 +510,72 @@ function setupBot() {
 }
 
 /**
+ * Handle webhook updates from Telegram
+ * @param update The update object from Telegram webhook
+ */
+export function handleWebhookUpdate(update: any) {
+  if (!bot) {
+    console.error("Cannot handle webhook update: Telegram bot not initialized");
+    return;
+  }
+  
+  try {
+    // Process the update manually
+    bot.processUpdate(update);
+  } catch (error) {
+    console.error("Error processing webhook update:", error);
+  }
+}
+
+/**
+ * Attempts to reconnect the telegram bot
+ */
+function reconnectBot() {
+  if (isReconnecting || !shouldRunTelegramBot || !telegramToken) {
+    return;
+  }
+
+  isReconnecting = true;
+  console.log(`Attempting to reconnect Telegram bot (attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})...`);
+
+  setTimeout(() => {
+    try {
+      if (bot) {
+        // Clean up existing bot
+        bot.close();
+      }
+
+      // Create a new bot instance with polling
+      bot = new TelegramBot(telegramToken, { polling: true });
+      
+      // Set up the handlers again
+      setupBot();
+      
+      console.log("Telegram bot reconnected successfully");
+      
+      // Reset reconnect counter on success
+      reconnectAttempts = 0;
+      reconnectDelay = 5000; // Reset to initial delay
+      isReconnecting = false;
+    } catch (error) {
+      console.error("Failed to reconnect Telegram bot:", error);
+      
+      reconnectAttempts++;
+      
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        // Exponential backoff
+        reconnectDelay *= 2;
+        isReconnecting = false;
+        reconnectBot();
+      } else {
+        console.error(`Maximum reconnection attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Giving up.`);
+        isReconnecting = false;
+      }
+    }
+  }, reconnectDelay);
+}
+
+/**
  * Send a message to a specific Telegram chat
  * @param chatId The ID of the chat to send the message to
  * @param message The message to send
@@ -440,6 +591,15 @@ export async function sendTelegramMessage(chatId: string, message: string) {
     return { success: true };
   } catch (error) {
     console.error("Error sending Telegram message:", error);
+    
+    // Check if this is a connection error and try to reconnect
+    if (error instanceof Error && 
+        (error.message.includes('ETELEGRAM') || 
+         error.message.includes('ENOTFOUND') || 
+         error.message.includes('ETIMEDOUT'))) {
+      reconnectBot();
+    }
+    
     return { success: false, error: "Failed to send message" };
   }
 }
