@@ -95,12 +95,12 @@ export const vendorPayments = pgTable("vendor_payments", {
 
 // Telegram Users Table
 export const telegramUsers = pgTable("telegram_users", {
-  id: serial("id").primaryKey(),
-  chat_id: varchar("chat_id", { length: 255 }).notNull().unique(),
-  user_id: integer("user_id").notNull().references(() => users.user_id),
-  last_active: timestamp("last_active").defaultNow(),
-  created_at: timestamp("created_at").defaultNow(),
-  updated_at: timestamp("updated_at").defaultNow()
+  telegram_id: integer("telegram_id").primaryKey(),
+  username: text("username"),
+  first_name: text("first_name"),
+  last_name: text("last_name"),
+  role: text("role"),
+  last_activity: timestamp("last_activity", { withTimezone: true }).defaultNow()
 });
 
 // AI Assistant Messages
@@ -159,12 +159,7 @@ export const insertAIMessageSchema = createInsertSchema(aiMessages).omit({
 });
 
 // Telegram user schema
-export const insertTelegramUserSchema = createInsertSchema(telegramUsers).omit({
-  id: true,
-  created_at: true,
-  updated_at: true,
-  last_active: true
-});
+export const insertTelegramUserSchema = createInsertSchema(telegramUsers);
 
 // User schemas
 export const insertUserSchema = createInsertSchema(users).omit({

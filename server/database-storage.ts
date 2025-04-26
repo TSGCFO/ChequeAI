@@ -566,7 +566,7 @@ export class DatabaseStorage implements IStorage {
       const [telegramUser] = await db
         .select()
         .from(telegramUsers)
-        .where(eq(telegramUsers.chat_id, chatId));
+        .where(eq(telegramUsers.telegram_id, parseInt(chatId)));
       
       return telegramUser;
     } catch (error) {
@@ -593,7 +593,7 @@ export class DatabaseStorage implements IStorage {
     try {
       const result = await db
         .delete(telegramUsers)
-        .where(eq(telegramUsers.chat_id, chatId))
+        .where(eq(telegramUsers.telegram_id, parseInt(chatId)))
         .returning();
       
       return result.length > 0;
@@ -607,8 +607,8 @@ export class DatabaseStorage implements IStorage {
     try {
       const [result] = await db
         .update(telegramUsers)
-        .set({ last_active: new Date() })
-        .where(eq(telegramUsers.chat_id, chatId))
+        .set({ last_activity: new Date() })
+        .where(eq(telegramUsers.telegram_id, parseInt(chatId)))
         .returning();
       
       return result;
