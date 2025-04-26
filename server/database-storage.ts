@@ -240,20 +240,21 @@ export class DatabaseStorage implements IStorage {
         ? parseFloat(totalProfitResult.rows[0].sum).toFixed(2) 
         : "0.00";
       
-      // Get outstanding balance from pending transactions
-      const outstandingBalanceSQL = "SELECT SUM(cheque_amount) FROM cheque_transactions WHERE status = $1";
-      const outstandingBalanceSQLResult = await pool.query(outstandingBalanceSQL, ['pending']);
+      // Get outstanding balance (all transactions where received_from_vendor < amount_to_receive_from_vendor)
+      const outstandingBalanceSQL = "SELECT SUM(amount_to_receive_from_vendor - received_from_vendor) FROM cheque_transactions WHERE amount_to_receive_from_vendor > received_from_vendor";
+      const outstandingBalanceSQLResult = await pool.query(outstandingBalanceSQL);
       const outstandingBalance = outstandingBalanceSQLResult.rows[0].sum 
         ? parseFloat(outstandingBalanceSQLResult.rows[0].sum).toFixed(2) 
         : "0.00";
   
-      // Get pending and completed transaction counts
-      const pendingCountSQL = "SELECT COUNT(*) FROM cheque_transactions WHERE status = $1";
-      const pendingCountResult = await pool.query(pendingCountSQL, ['pending']);
+      // Get pending transactions (where received_from_vendor < amount_to_receive_from_vendor)
+      const pendingCountSQL = "SELECT COUNT(*) FROM cheque_transactions WHERE amount_to_receive_from_vendor > received_from_vendor";
+      const pendingCountResult = await pool.query(pendingCountSQL);
       const pendingTransactions = parseInt(pendingCountResult.rows[0].count) || 0;
   
-      const completedCountSQL = "SELECT COUNT(*) FROM cheque_transactions WHERE status = $1";
-      const completedCountResult = await pool.query(completedCountSQL, ['completed']);
+      // Get completed transactions (where received_from_vendor >= amount_to_receive_from_vendor)
+      const completedCountSQL = "SELECT COUNT(*) FROM cheque_transactions WHERE amount_to_receive_from_vendor <= received_from_vendor";
+      const completedCountResult = await pool.query(completedCountSQL);
       const completedTransactions = parseInt(completedCountResult.rows[0].count) || 0;
   
       return {
