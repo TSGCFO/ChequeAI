@@ -1,5 +1,6 @@
 import TelegramBot from "node-telegram-bot-api";
 import { generateAIResponse, processVoiceMessage, processChequeDocument } from "./openai";
+import { storage } from "../storage";
 
 // Telegram bot token from environment variables
 const telegramToken = process.env.TELEGRAM_BOT_TOKEN || "";
