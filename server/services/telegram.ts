@@ -77,11 +77,25 @@ const loginStates: Map<string, {
 // Check if a user is authenticated with the Telegram bot
 async function isAuthenticated(chatId: string): Promise<boolean> {
   try {
+    // Check for authentication state in memory first
+    const loginState = loginStates.get(chatId);
+    if (loginState && loginState.state === 'authenticated') {
+      return true;
+    }
+    
     // Check if we already have a telegram user with this chat ID
     const telegramUser = await storage.getTelegramUserByChatId(chatId);
     if (telegramUser) {
-      // Update last active timestamp
+      // User exists in database, update last active timestamp
       await storage.updateTelegramUserLastActive(chatId);
+      
+      // Set login state in memory for faster future checks
+      loginStates.set(chatId, { 
+        state: 'authenticated',
+        username: telegramUser.username || '',
+        userId: 0  // We don't have user_id in the new schema, but we keep the property
+      });
+      
       return true;
     }
     return false;

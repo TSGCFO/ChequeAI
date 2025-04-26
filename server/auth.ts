@@ -44,17 +44,26 @@ export async function hashPassword(password: string): Promise<string> {
  * @param stored The stored hashed password with salt
  */
 export async function comparePasswords(supplied: string, stored: string): Promise<boolean> {
-  // Check if the stored hash is a bcrypt hash (starts with $2b$)
-  if (stored.startsWith('$2b$')) {
-    // Use a simplified comparison for now, since we pre-hashed the superuser password
-    // This is a temporary solution for testing purposes
-    return supplied === 'Hassan8488$@';
-  } else {
-    // For scrypt hashes (our regular format)
-    const [hashed, salt] = stored.split(".");
-    const hashedBuf = Buffer.from(hashed, "hex");
-    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-    return timingSafeEqual(hashedBuf, suppliedBuf);
+  try {
+    // Check if the stored hash is a bcrypt hash (starts with $2b$)
+    if (stored.startsWith('$2b$')) {
+      // For bcrypt hashes, check direct match with known superuser password
+      // This is a temporary solution for initial testing
+      return supplied === 'Hassan8488$@';
+    } else {
+      // For scrypt hashes (our regular format)
+      const [hashed, salt] = stored.split(".");
+      if (!hashed || !salt) {
+        console.error("Invalid hash format - missing hash or salt");
+        return false;
+      }
+      const hashedBuf = Buffer.from(hashed, "hex");
+      const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+      return timingSafeEqual(hashedBuf, suppliedBuf);
+    }
+  } catch (error) {
+    console.error("Error comparing passwords:", error);
+    return false;
   }
 }
 
@@ -145,7 +154,7 @@ export function setupAuth(app: Express): void {
           await storage.updateUser(user.user_id, {
             // Ensure this matches the actual schema
             is_active: true, // Keep the user active
-            updated_at: new Date() // Update the timestamp
+            // We don't need to update timestamp as the database will do it automatically
           });
         }
         
@@ -231,7 +240,8 @@ export function setupAuth(app: Express): void {
  */
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   if (!req.isAuthenticated()) {
-    return res.status(401).json({ message: "Authentication required" });
+    res.status(401).json({ message: "Authentication required" });
+    return;
   }
   next();
 }
@@ -243,13 +253,15 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 export function requireRole(roles: (typeof userRoleEnum.enumValues)[number][]): (req: Request, res: Response, next: NextFunction) => void {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Authentication required" });
+      res.status(401).json({ message: "Authentication required" });
+      return;
     }
     
     const user = req.user as User;
     
     if (!roles.includes(user.role)) {
-      return res.status(403).json({ message: "Insufficient permissions" });
+      res.status(403).json({ message: "Insufficient permissions" });
+      return;
     }
     
     next();

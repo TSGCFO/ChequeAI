@@ -591,6 +591,12 @@ export class DatabaseStorage implements IStorage {
   
   async deleteTelegramUser(chatId: string): Promise<boolean> {
     try {
+      // First check if user exists
+      const user = await this.getTelegramUserByChatId(chatId);
+      if (!user) {
+        return false;
+      }
+      
       const result = await db
         .delete(telegramUsers)
         .where(eq(telegramUsers.telegram_id, parseInt(chatId)))
