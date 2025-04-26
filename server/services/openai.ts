@@ -1893,8 +1893,17 @@ export async function generateAIResponse(userMessage: string, conversationId: st
     // Get user ID from conversation if available
     let userId = null;
     try {
-      // Try to get user ID from conversation record for database-stored conversations
-      if (!conversationId.startsWith("session-")) {
+      // Check if this is a telegram conversation
+      if (conversationId.startsWith("telegram-")) {
+        // For telegram conversations, extract the chat ID and look up the user
+        const chatId = conversationId.replace("telegram-", "");
+        const telegramUser = await storage.getTelegramUserByChatId(chatId);
+        if (telegramUser) {
+          userId = telegramUser.user_id;
+        }
+      } 
+      // Check if this is a user conversation stored in the database
+      else if (!conversationId.startsWith("session-") && !isNaN(Number(conversationId))) {
         const convId = parseInt(conversationId);
         const [userConversation] = await db
           .select()
