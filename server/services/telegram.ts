@@ -13,10 +13,8 @@ const isDeployedEnvironment = process.env.REPLIT_DEPLOYMENT === 'true' ||
                              process.env.NODE_ENV === 'production';
 
 // Check if we should run the Telegram bot
-// IMPORTANT: In development, we keep it disabled by default to prevent polling conflicts
-// In production, we enable it by default unless explicitly disabled
+// Always enable the Telegram bot if a token is available
 const shouldRunTelegramBot = telegramToken && 
-  (isDeployedEnvironment || process.env.ENABLE_TELEGRAM_BOT === 'true') && 
   process.env.DISABLE_TELEGRAM_BOT !== 'true';
 
 // Try to initialize the bot if token is available and we should run it
