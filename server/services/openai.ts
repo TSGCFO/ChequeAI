@@ -1899,7 +1899,8 @@ export async function generateAIResponse(userMessage: string, conversationId: st
         const chatId = conversationId.replace("telegram-", "");
         const telegramUser = await storage.getTelegramUserByChatId(chatId);
         if (telegramUser) {
-          userId = telegramUser.user_id;
+          // Use telegram_id instead of user_id for the new schema
+          userId = telegramUser.telegram_id;
         }
       } 
       // Check if this is a user conversation stored in the database
