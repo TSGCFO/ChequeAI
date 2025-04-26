@@ -158,6 +158,7 @@ async function processAuthentication(chatId: string, text: string): Promise<stri
     try {
       await storage.createTelegramUser({
         telegram_id: parseInt(chatId),
+        user_id: user.user_id,  // Link to web user
         username: user.username,
         role: user.role,
         first_name: user.first_name,

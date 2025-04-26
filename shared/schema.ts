@@ -96,6 +96,7 @@ export const vendorPayments = pgTable("vendor_payments", {
 // Telegram Users Table
 export const telegramUsers = pgTable("telegram_users", {
   telegram_id: integer("telegram_id").primaryKey(),
+  user_id: integer("user_id").notNull().references(() => users.user_id),
   username: text("username"),
   first_name: text("first_name"),
   last_name: text("last_name"),
