@@ -174,7 +174,7 @@ export default function Settings() {
     
     try {
       // Use the user registration API endpoint
-      const response = await fetch('/api/user/register', {
+      const response = await fetch('/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
