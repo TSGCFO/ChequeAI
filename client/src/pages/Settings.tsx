@@ -67,15 +67,10 @@ export default function Settings() {
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Define a user type for easier handling
-  type UserWithoutPassword = Omit<Express.User, 'password'> & {
-    password?: undefined;
-  };
-  
   // Fetch users from the API
-  const [users, setUsers] = useState<UserWithoutPassword[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<UserWithoutPassword | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
   
   // Fetch users when the tab changes to "users"
   useEffect(() => {
@@ -250,8 +245,18 @@ export default function Settings() {
   };
   
   const handleEditUser = async () => {
+    // Make sure we have a selected user
+    if (!selectedUser) {
+      toast({
+        title: "Error",
+        description: "No user selected",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     // Don't allow regular users to modify admin/superuser
-    if (!isSuperuser && selectedUser.role !== "user") {
+    if (!isSuperuser && selectedUser && selectedUser.role !== "user") {
       toast({
         title: "Permission Denied",
         description: "Only superusers can modify admin accounts",
@@ -304,7 +309,7 @@ export default function Settings() {
     }
   };
   
-  const handleStartEditUser = (userToEdit: any) => {
+  const handleStartEditUser = (userToEdit: AppUser) => {
     setSelectedUser(userToEdit);
     
     // Pre-fill the edit form with the user's current data
