@@ -34,6 +34,20 @@ import {
 import { Loader2, Plus, Pencil, Trash2, Shield } from "lucide-react";
 import { InsertUser } from "@shared/schema";
 
+// Create our own User interface to match backend structure
+interface AppUser {
+  user_id: number;
+  username: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: "user" | "admin" | "superuser";
+  is_active: boolean;
+  last_login: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 type UserFormData = {
   username: string;
   email: string;
@@ -42,6 +56,7 @@ type UserFormData = {
   first_name: string;
   last_name: string;
   role: "user" | "admin" | "superuser";
+  is_active?: boolean;
 };
 
 export default function Settings() {
@@ -52,10 +67,15 @@ export default function Settings() {
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
+  // Define a user type for easier handling
+  type UserWithoutPassword = Omit<Express.User, 'password'> & {
+    password?: undefined;
+  };
+  
   // Fetch users from the API
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<UserWithoutPassword[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedUser, setSelectedUser] = useState<UserWithoutPassword | null>(null);
   
   // Fetch users when the tab changes to "users"
   useEffect(() => {
