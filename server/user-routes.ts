@@ -121,7 +121,7 @@ export function registerUserRoutes(app: Express, apiRouter: string): void {
   // Update user profile
   app.patch(`${apiRouter}/user/profile`, requireAuth, async (req, res) => {
     try {
-      const currentUser = req.user;
+      const currentUser = req.user as Express.User;
       const validatedData = updateUserSchema.parse(req.body);
       
       const updatedUser = await storage.updateUser(currentUser.user_id, validatedData);
@@ -148,11 +148,17 @@ export function registerUserRoutes(app: Express, apiRouter: string): void {
   // Change password
   app.post(`${apiRouter}/user/change-password`, requireAuth, async (req, res) => {
     try {
-      const currentUser = req.user;
+      const currentUser = req.user as Express.User;
       const validatedData = changePasswordSchema.parse(req.body);
       
+      // Get the full user from the database to access the password
+      const fullUser = await storage.getUser(currentUser.user_id);
+      if (!fullUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
       // Verify current password
-      const isPasswordValid = await comparePasswords(validatedData.currentPassword, currentUser.password);
+      const isPasswordValid = await comparePasswords(validatedData.currentPassword, fullUser.password);
       if (!isPasswordValid) {
         return res.status(400).json({ message: "Current password is incorrect" });
       }
@@ -160,10 +166,11 @@ export function registerUserRoutes(app: Express, apiRouter: string): void {
       // Hash new password
       const hashedPassword = await hashPassword(validatedData.newPassword);
       
-      // Update password
+      // Update password using the internal database update method
+      // This bypasses the type checking on the password field in updateUserSchema
       const updatedUser = await storage.updateUser(currentUser.user_id, {
         password: hashedPassword
-      });
+      } as any); // Using 'any' here to bypass TypeScript's type checking
       
       if (!updatedUser) {
         return res.status(404).json({ message: "User not found" });
@@ -270,9 +277,10 @@ export function registerUserRoutes(app: Express, apiRouter: string): void {
   app.delete(`${apiRouter}/users/:id`, requireAuth, requireRole(['superuser']), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const currentUser = req.user as Express.User;
       
       // Prevent deleting yourself
-      if (req.user.user_id === id) {
+      if (currentUser.user_id === id) {
         return res.status(400).json({ message: "Cannot delete your own account" });
       }
       
@@ -291,7 +299,8 @@ export function registerUserRoutes(app: Express, apiRouter: string): void {
   // Get user conversations
   app.get(`${apiRouter}/user/conversations`, requireAuth, async (req, res) => {
     try {
-      const userId = req.user.user_id;
+      const currentUser = req.user as Express.User;
+      const userId = currentUser.user_id;
       const conversations = await storage.getUserConversations(userId);
       res.json(conversations);
     } catch (error) {
@@ -303,7 +312,8 @@ export function registerUserRoutes(app: Express, apiRouter: string): void {
   // Create new conversation
   app.post(`${apiRouter}/user/conversations`, requireAuth, async (req, res) => {
     try {
-      const userId = req.user.user_id;
+      const currentUser = req.user as Express.User;
+      const userId = currentUser.user_id;
       const { title } = req.body;
       
       const conversation = await storage.createUserConversation({
@@ -321,7 +331,8 @@ export function registerUserRoutes(app: Express, apiRouter: string): void {
   // Delete conversation
   app.delete(`${apiRouter}/user/conversations/:id`, requireAuth, async (req, res) => {
     try {
-      const userId = req.user.user_id;
+      const currentUser = req.user as Express.User;
+      const userId = currentUser.user_id;
       const conversationId = parseInt(req.params.id);
       
       // Verify ownership
@@ -332,7 +343,7 @@ export function registerUserRoutes(app: Express, apiRouter: string): void {
       }
       
       // Only allow users to delete their own conversations (unless superuser/admin)
-      if (conversation.user_id !== userId && !['superuser', 'admin'].includes(req.user.role)) {
+      if (conversation.user_id !== userId && !['superuser', 'admin'].includes(currentUser.role)) {
         return res.status(403).json({ message: "Not authorized to delete this conversation" });
       }
       
