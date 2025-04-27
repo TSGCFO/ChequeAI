@@ -50,13 +50,7 @@ if (shouldRunTelegramBot) {
           bot = new TelegramBot(telegramToken, {
             polling: true,
             // Add error handling for polling
-            onlyFirstMatch: true,
-            request: {
-              // Increase timeout to handle slow connections
-              timeout: 60000,
-              // Add automatic retry
-              agent: false
-            }
+            onlyFirstMatch: true
           });
           
           // Register error handler for polling errors
@@ -75,13 +69,7 @@ if (shouldRunTelegramBot) {
         bot = new TelegramBot(telegramToken, {
           polling: true,
           // Add error handling for polling
-          onlyFirstMatch: true,
-          request: {
-            // Increase timeout to handle slow connections
-            timeout: 60000,
-            // Add automatic retry
-            agent: false
-          }
+          onlyFirstMatch: true
         });
         
         // Register error handler for polling errors
@@ -100,13 +88,7 @@ if (shouldRunTelegramBot) {
       bot = new TelegramBot(telegramToken, {
         polling: true,
         // Add error handling for polling
-        onlyFirstMatch: true,
-        request: {
-          // Increase timeout to handle slow connections
-          timeout: 60000,
-          // Add automatic retry
-          agent: false
-        }
+        onlyFirstMatch: true
       });
       
       // Register error handler for polling errors
@@ -546,7 +528,10 @@ function reconnectBot() {
       }
 
       // Create a new bot instance with polling
-      bot = new TelegramBot(telegramToken, { polling: true });
+      bot = new TelegramBot(telegramToken, { 
+        polling: true,
+        onlyFirstMatch: true 
+      });
       
       // Set up the handlers again
       setupBot();
