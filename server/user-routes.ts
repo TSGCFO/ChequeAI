@@ -28,6 +28,58 @@ export function registerUserRoutes(app: Express, apiRouter: string): void {
     }
   });
 
+  // Public user registration endpoint (for testing)
+  app.post(`${apiRouter}/register`, async (req, res) => {
+    try {
+      const validatedData = insertUserSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(validatedData.username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Hash password
+      const hashedPassword = await hashPassword(validatedData.password);
+      
+      // Create user without the confirmPassword field
+      const { confirmPassword, ...userData } = validatedData;
+      
+      const newUser = await storage.createUser({
+        ...userData,
+        password: hashedPassword
+      });
+      
+      // Remove sensitive information
+      const safeUser = {
+        ...newUser,
+        password: undefined
+      };
+      
+      // Log the user in automatically
+      req.login(newUser, (loginErr) => {
+        if (loginErr) {
+          console.error("Error logging in new user:", loginErr);
+          return res.status(201).json({ 
+            message: "User created successfully, but automatic login failed. Please log in manually.",
+            user: safeUser
+          });
+        }
+        
+        return res.status(201).json({ 
+          message: "User created and logged in successfully",
+          user: safeUser
+        });
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Error registering user:", error);
+      res.status(500).json({ message: "Failed to register user" });
+    }
+  });
+  
   // Register user (for admin/superuser only)
   app.post(`${apiRouter}/user/register`, requireAuth, requireRole(['superuser', 'admin']), async (req, res) => {
     try {
@@ -128,10 +180,28 @@ export function registerUserRoutes(app: Express, apiRouter: string): void {
   });
 
   // User management (for superuser role only)
-  // Get all users
-  app.get(`${apiRouter}/users`, requireAuth, requireRole(['superuser']), async (req, res) => {
+  // Get all users (with special handling for no-users case)
+  app.get(`${apiRouter}/users`, async (req, res) => {
     try {
       const users = await storage.getUsers();
+      
+      // Special case: If no users exist, return a helpful message
+      if (users.length === 0) {
+        return res.status(404).json({
+          message: "No users found in the system. Use the /api/initial-setup endpoint to create the first superuser account."
+        });
+      }
+      
+      // Otherwise, enforce authentication and authorization
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Only superusers can list all users
+      const user = req.user as Express.User;
+      if (user.role !== 'superuser') {
+        return res.status(403).json({ message: "Only superusers can view the list of all users" });
+      }
       
       // Remove sensitive information
       const safeUsers = users.map(user => ({

@@ -231,6 +231,61 @@ export function setupAuth(app: Express): void {
     return res.json(safeUser);
   });
 
+  // Initial user registration (only works when no users exist)
+  app.post("/api/initial-setup", async (req, res) => {
+    try {
+      // Check if users already exist
+      const users = await storage.getUsers();
+      if (users.length > 0) {
+        return res.status(403).json({ message: "Initial setup already completed. Users already exist in the system." });
+      }
+      
+      // Validate input
+      const { username, password, email, first_name, last_name } = req.body;
+      if (!username || !password || !email) {
+        return res.status(400).json({ message: "Username, password, and email are required" });
+      }
+      
+      // Create the first superuser
+      const hashedPassword = await hashPassword(password);
+      const newUser = await storage.createUser({
+        username,
+        password: hashedPassword,
+        email,
+        first_name: first_name || null,
+        last_name: last_name || null,
+        role: 'superuser',
+        is_active: true
+      });
+      
+      // Log the user in automatically
+      req.login(newUser, (loginErr) => {
+        if (loginErr) {
+          console.error("Error logging in new user:", loginErr);
+          return res.status(201).json({ 
+            message: "Initial superuser created successfully, but automatic login failed. Please log in manually.",
+            user: { ...newUser, password: undefined }
+          });
+        }
+        
+        // Return user without password
+        const safeUser = {
+          ...newUser,
+          password: undefined
+        };
+        
+        return res.status(201).json({ 
+          message: "Initial superuser created successfully",
+          user: safeUser
+        });
+      });
+      
+    } catch (error) {
+      console.error("Error in initial setup:", error);
+      res.status(500).json({ message: "Failed to complete initial setup" });
+    }
+  });
+  
   // Create default superuser if needed
   createSuperuserIfNeeded();
 }
