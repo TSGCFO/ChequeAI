@@ -31,12 +31,23 @@ export function registerUserRoutes(app: Express, apiRouter: string): void {
   // Public user registration endpoint (for testing)
   app.post(`${apiRouter}/register`, async (req, res) => {
     try {
-      const validatedData = insertUserSchema.parse(req.body);
+      console.log("Registration request body:", JSON.stringify(req.body));
       
-      // Check if user already exists
-      const existingUser = await storage.getUserByUsername(validatedData.username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
+      let validatedData;
+      try {
+        validatedData = insertUserSchema.parse(req.body);
+        
+        // Check if user already exists
+        const existingUser = await storage.getUserByUsername(validatedData.username);
+        if (existingUser) {
+          return res.status(400).json({ message: "Username already exists" });
+        }
+      } catch (validationError) {
+        console.error("Validation error details:", validationError);
+        if (validationError instanceof z.ZodError) {
+          return res.status(400).json({ message: "Validation error", errors: validationError.errors });
+        }
+        throw validationError;
       }
 
       // Hash password

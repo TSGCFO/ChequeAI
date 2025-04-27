@@ -183,10 +183,10 @@ export default function Settings() {
           username: newUserForm.username,
           email: newUserForm.email,
           password: newUserForm.password,
+          confirmPassword: newUserForm.confirmPassword,
           first_name: newUserForm.first_name,
           last_name: newUserForm.last_name,
-          role: newUserForm.role,
-          is_active: true
+          role: newUserForm.role
         }),
       });
       
