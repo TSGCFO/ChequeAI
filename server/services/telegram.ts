@@ -22,14 +22,10 @@ let isReconnecting = false;
 const isDeployedEnvironment = process.env.REPLIT_DEPLOYMENT === 'true' || 
                              process.env.NODE_ENV === 'production';
 
-// Initialize a flag to track if we've encountered conflicts
-let hasEncounteredConflict = false;
-
 // Check if we should run the Telegram bot
-// Enable the Telegram bot if a token is available AND not explicitly disabled AND no conflict detected
+// Always enable the Telegram bot if a token is available
 const shouldRunTelegramBot = telegramToken && 
-  process.env.DISABLE_TELEGRAM_BOT !== 'true' &&
-  !hasEncounteredConflict;
+  process.env.DISABLE_TELEGRAM_BOT !== 'true';
 
 // Try to initialize the bot if token is available and we should run it
 if (shouldRunTelegramBot) {
@@ -99,38 +95,7 @@ if (shouldRunTelegramBot) {
       bot.on('polling_error', (error) => {
         console.error('Telegram polling error:', error);
         
-        // Check for conflict error
-        if (error.message && error.message.includes('Conflict: terminated by other getUpdates request')) {
-          console.log('Telegram conflict detected, disabling bot to prevent further conflicts');
-          hasEncounteredConflict = true;
-          if (bot) {
-            try {
-              bot.stopPolling();
-              bot = null;
-            } catch (closeError) {
-              console.error("Error stopping polling after conflict:", closeError);
-              bot = null;
-            }
-          }
-          return;
-        }
-        
-        // Check for rate limit error
-        if (error.message && error.message.includes('429 Too Many Requests')) {
-          const match = error.message.match(/retry after (\d+)/i);
-          const retryAfterSecs = match ? parseInt(match[1], 10) : 60;
-          console.log(`Telegram rate limited, backing off for ${retryAfterSecs} seconds`);
-          
-          // Mark as encoutered conflict to prevent further API calls
-          hasEncounteredConflict = true;
-          console.log(`Telegram bot completely disabled due to rate limiting`);
-          
-          // Clear the bot reference without trying to close it (which would make another API call)
-          bot = null;
-          return;
-        }
-        
-        // Attempt to reconnect for other errors
+        // Attempt to reconnect
         if (!isReconnecting) {
           reconnectBot();
         }
@@ -142,24 +107,14 @@ if (shouldRunTelegramBot) {
     process.on('SIGINT', () => {
       console.log('SIGINT received, closing Telegram bot');
       if (bot) {
-        try {
-          bot.stopPolling().catch(e => console.error("Error stopping polling on SIGINT:", e));
-        } catch (error) {
-          console.error("Error closing Telegram bot on SIGINT:", error);
-        }
-        bot = null;
+        bot.close();
       }
     });
     
     process.on('SIGTERM', () => {
       console.log('SIGTERM received, closing Telegram bot');
       if (bot) {
-        try {
-          bot.stopPolling().catch(e => console.error("Error stopping polling on SIGTERM:", e));
-        } catch (error) {
-          console.error("Error closing Telegram bot on SIGTERM:", error);
-        }
-        bot = null;
+        bot.close();
       }
     });
     
@@ -546,38 +501,11 @@ export function handleWebhookUpdate(update: any) {
     return;
   }
   
-  // Don't process updates if we've detected a conflict
-  if (hasEncounteredConflict) {
-    console.error("Cannot handle webhook update: Bot has detected conflicts and is disabled");
-    return;
-  }
-  
   try {
     // Process the update manually
     bot.processUpdate(update);
   } catch (error) {
     console.error("Error processing webhook update:", error);
-    
-    // Check for specific error types that indicate need for reconnection
-    if (error instanceof Error) {
-      // Handle rate limit errors
-      if (error.message.includes('429 Too Many Requests')) {
-        console.log("Telegram rate limit exceeded, backing off");
-        // Don't attempt to reconnect immediately for rate limits
-        return;
-      }
-      
-      // Handle conflict errors
-      if (error.message.includes('409') || error.message.includes('Conflict')) {
-        console.log("Telegram conflict detected in webhook, disabling bot to prevent further conflicts");
-        hasEncounteredConflict = true;
-        if (bot) {
-          bot.close().catch(e => console.error("Error closing bot after conflict:", e));
-          bot = null;
-        }
-        return;
-      }
-    }
   }
 }
 
@@ -585,12 +513,7 @@ export function handleWebhookUpdate(update: any) {
  * Attempts to reconnect the telegram bot
  */
 function reconnectBot() {
-  // Don't reconnect if:
-  // 1. We're already in the process of reconnecting
-  // 2. The bot shouldn't be running
-  // 3. No token is available
-  // 4. We've detected conflicts
-  if (isReconnecting || !shouldRunTelegramBot || !telegramToken || hasEncounteredConflict) {
+  if (isReconnecting || !shouldRunTelegramBot || !telegramToken) {
     return;
   }
 
@@ -601,67 +524,16 @@ function reconnectBot() {
     try {
       if (bot) {
         // Clean up existing bot
-        try {
-          bot.close();
-        } catch (closeError) {
-          console.error("Error closing Telegram bot during reconnection:", closeError);
-          // Continue anyway, as we're creating a new instance
-        }
-      }
-
-      // Don't try to reconnect if conflict has been detected during the delay
-      if (hasEncounteredConflict) {
-        console.log("Not reconnecting because conflicts were detected");
-        isReconnecting = false;
-        return;
+        bot.close();
       }
 
       // Create a new bot instance with polling
       bot = new TelegramBot(telegramToken, { 
         polling: true,
-        onlyFirstMatch: true
+        onlyFirstMatch: true 
       });
       
-      // Add an improved polling error handler
-      bot.on('polling_error', (error) => {
-        console.error('Telegram polling error:', error);
-        
-        // Handle specific errors
-        if (error.message) {
-          // Rate limiting
-          if (error.message.includes('429 Too Many Requests')) {
-            const match = error.message.match(/retry after (\d+)/i);
-            const retryAfterSecs = match ? parseInt(match[1], 10) : 60;
-            console.log(`Telegram rate limited, backing off for ${retryAfterSecs} seconds`);
-            
-            // Completely disable the bot on rate limiting to prevent cascading failures
-            hasEncounteredConflict = true;
-            console.log(`Telegram bot completely disabled due to rate limiting`);
-            
-            // Just null the reference without trying to close/stopPolling
-            bot = null;
-            isReconnecting = false;
-            return;
-          }
-          
-          // Conflict with another bot instance
-          if (error.message.includes('409') || error.message.includes('Conflict')) {
-            console.log('Telegram conflict detected, disabling bot to prevent further conflicts');
-            hasEncounteredConflict = true;
-            // Don't try to close the bot as that can trigger more API calls
-            bot = null;
-            isReconnecting = false;
-            return;
-          }
-        }
-        
-        // For other errors, attempt standard reconnection
-        if (!isReconnecting) {
-          reconnectBot();
-        }
-      });
-      
-      // Set up the message handlers again
+      // Set up the handlers again
       setupBot();
       
       console.log("Telegram bot reconnected successfully");
@@ -683,12 +555,6 @@ function reconnectBot() {
       } else {
         console.error(`Maximum reconnection attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Giving up.`);
         isReconnecting = false;
-        
-        // Disable bot after too many failed attempts
-        hasEncounteredConflict = true;
-        console.log("Maximum reconnection attempts reached, completely disabling bot");
-        // Don't try to close the bot, just null the reference
-        bot = null;
       }
     }
   }, reconnectDelay);

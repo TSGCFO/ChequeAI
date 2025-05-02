@@ -82,9 +82,7 @@ export default function Settings() {
   const fetchUsers = async () => {
     setIsLoadingUsers(true);
     try {
-      const response = await fetch('/api/users', {
-        credentials: 'include' // Add credentials to include session cookies
-      });
+      const response = await fetch('/api/users');
       if (!response.ok) {
         throw new Error('Failed to fetch users');
       }
@@ -196,7 +194,6 @@ export default function Settings() {
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({
           username: newUserForm.username,
           email: newUserForm.email,
@@ -277,7 +274,6 @@ export default function Settings() {
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({
           email: editUserForm.email,
           first_name: editUserForm.first_name,
@@ -343,7 +339,6 @@ export default function Settings() {
       // Call the API to delete the user
       const response = await fetch(`/api/users/${userId}`, {
         method: 'DELETE',
-        credentials: 'include'
       });
       
       if (!response.ok) {

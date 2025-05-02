@@ -199,25 +199,30 @@ export function registerUserRoutes(app: Express, apiRouter: string): void {
 
   // User management (for superuser role only)
   // Get all users (with special handling for no-users case)
-  app.get(`${apiRouter}/users`, requireAuth, requireRole(['superuser', 'admin']), async (req, res) => {
+  app.get(`${apiRouter}/users`, async (req, res) => {
     try {
-      const allUsers = await storage.getUsers();
+      const users = await storage.getUsers();
       
       // Special case: If no users exist, return a helpful message
-      if (allUsers.length === 0) {
+      if (users.length === 0) {
         return res.status(404).json({
           message: "No users found in the system. Use the /api/initial-setup endpoint to create the first superuser account."
         });
       }
       
+      // Otherwise, enforce authentication and authorization
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Only superusers can list all users
       const user = req.user as Express.User;
-      // Admins can only see regular users, superusers can see all
-      const filteredUsers = user.role === 'admin' 
-        ? allUsers.filter(u => u.role === 'user') 
-        : allUsers;
+      if (user.role !== 'superuser') {
+        return res.status(403).json({ message: "Only superusers can view the list of all users" });
+      }
       
       // Remove sensitive information
-      const safeUsers = filteredUsers.map(user => ({
+      const safeUsers = users.map(user => ({
         ...user,
         password: undefined
       }));

@@ -48,7 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get business summary
-  app.get(`${apiRouter}/summary`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/summary`, async (req, res) => {
     try {
       // Try to use direct database connection first
       const { getBusinessSummary } = await import('./direct-db');
@@ -68,7 +68,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Reports endpoints
-  app.get(`${apiRouter}/reports/customer-balances`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/reports/customer-balances`, async (req, res) => {
     try {
       const results = await storage.getReportData("customer_balances");
       res.json(results);
@@ -78,7 +78,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/vendor-balances`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/reports/vendor-balances`, async (req, res) => {
     try {
       const results = await storage.getReportData("vendor_balances");
       res.json(results);
@@ -88,7 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/profit-summary/daily`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/reports/profit-summary/daily`, async (req, res) => {
     try {
       const results = await storage.getReportData("daily_profit_summary");
       res.json(results);
@@ -98,7 +98,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/profit-summary/weekly`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/reports/profit-summary/weekly`, async (req, res) => {
     try {
       const results = await storage.getReportData("weekly_profit_summary");
       res.json(results);
@@ -108,7 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/profit-summary/monthly`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/reports/profit-summary/monthly`, async (req, res) => {
     try {
       const results = await storage.getReportData("monthly_profit_summary");
       res.json(results);
@@ -118,7 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/profit-by-customer`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/reports/profit-by-customer`, async (req, res) => {
     try {
       const results = await storage.getReportData("profit_by_customer");
       res.json(results);
@@ -128,7 +128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/profit-by-vendor`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/reports/profit-by-vendor`, async (req, res) => {
     try {
       const results = await storage.getReportData("profit_by_vendor");
       res.json(results);
@@ -138,7 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/transaction-status`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/reports/transaction-status`, async (req, res) => {
     try {
       const results = await storage.getReportData("transaction_status_report");
       res.json(results);
@@ -148,7 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/outstanding-balances`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/reports/outstanding-balances`, async (req, res) => {
     try {
       const results = await storage.getReportData("outstanding_balances");
       res.json(results);
@@ -158,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/customer-detailed-transactions`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/reports/customer-detailed-transactions`, async (req, res) => {
     try {
       const customerId = req.query.customerId ? Number(req.query.customerId) : undefined;
       const results = await storage.getReportData("customer_detailed_transactions", { customerId });
@@ -169,7 +169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/vendor-detailed-transactions`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/reports/vendor-detailed-transactions`, async (req, res) => {
     try {
       const vendorId = req.query.vendorId as string | undefined;
       const results = await storage.getReportData("vendor_detailed_transactions", { vendorId });
@@ -181,7 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all transactions
-  app.get(`${apiRouter}/transactions`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/transactions`, async (req, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
@@ -222,7 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get transaction by ID
-  app.get(`${apiRouter}/transactions/:id`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/transactions/:id`, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const transaction = await storage.getTransactionWithDetails(id);
@@ -239,7 +239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create transaction
-  app.post(`${apiRouter}/transactions`, requireAuth, async (req, res) => {
+  app.post(`${apiRouter}/transactions`, async (req, res) => {
     try {
       const validatedData = insertTransactionSchema.parse(req.body);
       const transaction = await storage.createTransaction(validatedData);
@@ -254,7 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update transaction
-  app.patch(`${apiRouter}/transactions/:id`, requireAuth, async (req, res) => {
+  app.patch(`${apiRouter}/transactions/:id`, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertTransactionSchema.partial().parse(req.body);
@@ -275,7 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete transaction
-  app.delete(`${apiRouter}/transactions/:id`, requireAuth, async (req, res) => {
+  app.delete(`${apiRouter}/transactions/:id`, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteTransaction(id);
@@ -292,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all customers
-  app.get(`${apiRouter}/customers`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/customers`, async (req, res) => {
     try {
       const customers = await storage.getCustomers();
       res.json(customers);
@@ -303,7 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get customer by ID
-  app.get(`${apiRouter}/customers/:id`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/customers/:id`, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const customer = await storage.getCustomer(id);
@@ -320,7 +320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create customer
-  app.post(`${apiRouter}/customers`, requireAuth, async (req, res) => {
+  app.post(`${apiRouter}/customers`, async (req, res) => {
     try {
       const validatedData = insertCustomerSchema.parse(req.body);
       const customer = await storage.createCustomer(validatedData);
@@ -335,7 +335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update customer
-  app.patch(`${apiRouter}/customers/:id`, requireAuth, async (req, res) => {
+  app.patch(`${apiRouter}/customers/:id`, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertCustomerSchema.partial().parse(req.body);
@@ -356,7 +356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete customer
-  app.delete(`${apiRouter}/customers/:id`, requireAuth, async (req, res) => {
+  app.delete(`${apiRouter}/customers/:id`, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteCustomer(id);
@@ -388,7 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all vendors
-  app.get(`${apiRouter}/vendors`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/vendors`, async (req, res) => {
     try {
       const vendors = await storage.getVendors();
       res.json(vendors);
@@ -399,7 +399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get vendor by ID
-  app.get(`${apiRouter}/vendors/:id`, requireAuth, async (req, res) => {
+  app.get(`${apiRouter}/vendors/:id`, async (req, res) => {
     try {
       const id = req.params.id;
       const vendor = await storage.getVendor(id);
@@ -416,7 +416,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create vendor
-  app.post(`${apiRouter}/vendors`, requireAuth, async (req, res) => {
+  app.post(`${apiRouter}/vendors`, async (req, res) => {
     try {
       const validatedData = insertVendorSchema.parse(req.body);
       const vendor = await storage.createVendor(validatedData);
@@ -431,7 +431,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update vendor
-  app.patch(`${apiRouter}/vendors/:id`, requireAuth, async (req, res) => {
+  app.patch(`${apiRouter}/vendors/:id`, async (req, res) => {
     try {
       const id = req.params.id;
       const validatedData = insertVendorSchema.partial().parse(req.body);
@@ -452,7 +452,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete vendor
-  app.delete(`${apiRouter}/vendors/:id`, requireAuth, async (req, res) => {
+  app.delete(`${apiRouter}/vendors/:id`, async (req, res) => {
     try {
       const id = req.params.id;
       const success = await storage.deleteVendor(id);
@@ -469,7 +469,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Document processing with Tesseract
-  app.post(`${apiRouter}/process-document`, requireAuth, upload.single('document'), async (req, res) => {
+  app.post(`${apiRouter}/process-document`, upload.single('document'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No document uploaded" });
@@ -491,7 +491,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // AI-powered document processing using OpenAI vision model
-  app.post(`${apiRouter}/process-cheque`, requireAuth, upload.single('document'), async (req, res) => {
+  app.post(`${apiRouter}/process-cheque`, upload.single('document'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No document uploaded" });
@@ -629,7 +629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Send message to Telegram
-  app.post(`${apiRouter}/telegram/send`, requireAuth, async (req, res) => {
+  app.post(`${apiRouter}/telegram/send`, async (req, res) => {
     try {
       const { message, chatId } = req.body;
       
