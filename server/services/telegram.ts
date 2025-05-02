@@ -22,10 +22,14 @@ let isReconnecting = false;
 const isDeployedEnvironment = process.env.REPLIT_DEPLOYMENT === 'true' || 
                              process.env.NODE_ENV === 'production';
 
+// Initialize a flag to track if we've encountered conflicts
+let hasEncounteredConflict = false;
+
 // Check if we should run the Telegram bot
-// Always enable the Telegram bot if a token is available
+// Enable the Telegram bot if a token is available AND not explicitly disabled AND no conflict detected
 const shouldRunTelegramBot = telegramToken && 
-  process.env.DISABLE_TELEGRAM_BOT !== 'true';
+  process.env.DISABLE_TELEGRAM_BOT !== 'true' &&
+  !hasEncounteredConflict;
 
 // Try to initialize the bot if token is available and we should run it
 if (shouldRunTelegramBot) {
@@ -95,7 +99,18 @@ if (shouldRunTelegramBot) {
       bot.on('polling_error', (error) => {
         console.error('Telegram polling error:', error);
         
-        // Attempt to reconnect
+        // Check for conflict error
+        if (error.message && error.message.includes('Conflict: terminated by other getUpdates request')) {
+          console.log('Telegram conflict detected, disabling bot to prevent further conflicts');
+          hasEncounteredConflict = true;
+          if (bot) {
+            bot.close();
+            bot = null;
+          }
+          return;
+        }
+        
+        // Attempt to reconnect for other errors
         if (!isReconnecting) {
           reconnectBot();
         }
