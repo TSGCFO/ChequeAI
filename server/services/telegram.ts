@@ -104,9 +104,29 @@ if (shouldRunTelegramBot) {
           console.log('Telegram conflict detected, disabling bot to prevent further conflicts');
           hasEncounteredConflict = true;
           if (bot) {
-            bot.close();
-            bot = null;
+            try {
+              bot.stopPolling();
+              bot = null;
+            } catch (closeError) {
+              console.error("Error stopping polling after conflict:", closeError);
+              bot = null;
+            }
           }
+          return;
+        }
+        
+        // Check for rate limit error
+        if (error.message && error.message.includes('429 Too Many Requests')) {
+          const match = error.message.match(/retry after (\d+)/i);
+          const retryAfterSecs = match ? parseInt(match[1], 10) : 60;
+          console.log(`Telegram rate limited, backing off for ${retryAfterSecs} seconds`);
+          
+          // Mark as encoutered conflict to prevent further API calls
+          hasEncounteredConflict = true;
+          console.log(`Telegram bot completely disabled due to rate limiting`);
+          
+          // Clear the bot reference without trying to close it (which would make another API call)
+          bot = null;
           return;
         }
         
@@ -122,14 +142,24 @@ if (shouldRunTelegramBot) {
     process.on('SIGINT', () => {
       console.log('SIGINT received, closing Telegram bot');
       if (bot) {
-        bot.close();
+        try {
+          bot.stopPolling().catch(e => console.error("Error stopping polling on SIGINT:", e));
+        } catch (error) {
+          console.error("Error closing Telegram bot on SIGINT:", error);
+        }
+        bot = null;
       }
     });
     
     process.on('SIGTERM', () => {
       console.log('SIGTERM received, closing Telegram bot');
       if (bot) {
-        bot.close();
+        try {
+          bot.stopPolling().catch(e => console.error("Error stopping polling on SIGTERM:", e));
+        } catch (error) {
+          console.error("Error closing Telegram bot on SIGTERM:", error);
+        }
+        bot = null;
       }
     });
     
@@ -588,23 +618,8 @@ function reconnectBot() {
 
       // Create a new bot instance with polling
       bot = new TelegramBot(telegramToken, { 
-        polling: {
-          timeout: 10,           // How long to wait for updates (seconds)
-          limit: 100,            // Max number of updates to fetch at once
-          allowed_updates: [],   // All update types
-          params: {
-            offset: -1           // Start from newest messages
-          }
-        },
-        onlyFirstMatch: true,
-        request: {
-          // Improved request settings to avoid network issues
-          timeout: 30000,        // Timeout for API requests (milliseconds)
-          proxy: null,
-          forever: true,         // Keep alive connection
-          simple: false,         // Don't reject on non-2xx responses
-          resolveWithFullResponse: true // Get full response object
-        }
+        polling: true,
+        onlyFirstMatch: true
       });
       
       // Add an improved polling error handler
@@ -619,22 +634,13 @@ function reconnectBot() {
             const retryAfterSecs = match ? parseInt(match[1], 10) : 60;
             console.log(`Telegram rate limited, backing off for ${retryAfterSecs} seconds`);
             
-            // Close the bot to prevent further requests
-            if (bot) {
-              bot.close().catch(e => console.error("Error closing rate-limited bot:", e));
-              bot = null;
-            }
+            // Completely disable the bot on rate limiting to prevent cascading failures
+            hasEncounteredConflict = true;
+            console.log(`Telegram bot completely disabled due to rate limiting`);
             
-            // Set a much longer delay for rate limits
-            reconnectDelay = (retryAfterSecs * 1000) + 5000; // Add 5 seconds buffer
-            reconnectAttempts = 0; // Reset attempts for rate limits
+            // Just null the reference without trying to close/stopPolling
+            bot = null;
             isReconnecting = false;
-            
-            // Schedule a reconnection after the rate limit expires
-            setTimeout(() => {
-              reconnectBot();
-            }, reconnectDelay);
-            
             return;
           }
           
@@ -642,10 +648,8 @@ function reconnectBot() {
           if (error.message.includes('409') || error.message.includes('Conflict')) {
             console.log('Telegram conflict detected, disabling bot to prevent further conflicts');
             hasEncounteredConflict = true;
-            if (bot) {
-              bot.close().catch(e => console.error("Error closing conflicted bot:", e));
-              bot = null;
-            }
+            // Don't try to close the bot as that can trigger more API calls
+            bot = null;
             isReconnecting = false;
             return;
           }
@@ -682,10 +686,9 @@ function reconnectBot() {
         
         // Disable bot after too many failed attempts
         hasEncounteredConflict = true;
-        if (bot) {
-          bot.close().catch(e => console.error("Error closing failed bot:", e));
-          bot = null;
-        }
+        console.log("Maximum reconnection attempts reached, completely disabling bot");
+        // Don't try to close the bot, just null the reference
+        bot = null;
       }
     }
   }, reconnectDelay);
