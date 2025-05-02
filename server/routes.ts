@@ -629,7 +629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Send message to Telegram
-  app.post(`${apiRouter}/telegram/send`, async (req, res) => {
+  app.post(`${apiRouter}/telegram/send`, requireAuth, async (req, res) => {
     try {
       const { message, chatId } = req.body;
       
