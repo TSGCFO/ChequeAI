@@ -181,7 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all transactions
-  app.get(`${apiRouter}/transactions`, async (req, res) => {
+  app.get(`${apiRouter}/transactions`, requireAuth, async (req, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
@@ -222,7 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get transaction by ID
-  app.get(`${apiRouter}/transactions/:id`, async (req, res) => {
+  app.get(`${apiRouter}/transactions/:id`, requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const transaction = await storage.getTransactionWithDetails(id);
@@ -239,7 +239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create transaction
-  app.post(`${apiRouter}/transactions`, async (req, res) => {
+  app.post(`${apiRouter}/transactions`, requireAuth, async (req, res) => {
     try {
       const validatedData = insertTransactionSchema.parse(req.body);
       const transaction = await storage.createTransaction(validatedData);
@@ -254,7 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update transaction
-  app.patch(`${apiRouter}/transactions/:id`, async (req, res) => {
+  app.patch(`${apiRouter}/transactions/:id`, requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertTransactionSchema.partial().parse(req.body);
@@ -275,7 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete transaction
-  app.delete(`${apiRouter}/transactions/:id`, async (req, res) => {
+  app.delete(`${apiRouter}/transactions/:id`, requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteTransaction(id);
@@ -292,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all customers
-  app.get(`${apiRouter}/customers`, async (req, res) => {
+  app.get(`${apiRouter}/customers`, requireAuth, async (req, res) => {
     try {
       const customers = await storage.getCustomers();
       res.json(customers);
@@ -303,7 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get customer by ID
-  app.get(`${apiRouter}/customers/:id`, async (req, res) => {
+  app.get(`${apiRouter}/customers/:id`, requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const customer = await storage.getCustomer(id);
