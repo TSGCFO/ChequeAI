@@ -88,7 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/profit-summary/daily`, async (req, res) => {
+  app.get(`${apiRouter}/reports/profit-summary/daily`, requireAuth, async (req, res) => {
     try {
       const results = await storage.getReportData("daily_profit_summary");
       res.json(results);
@@ -98,7 +98,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/profit-summary/weekly`, async (req, res) => {
+  app.get(`${apiRouter}/reports/profit-summary/weekly`, requireAuth, async (req, res) => {
     try {
       const results = await storage.getReportData("weekly_profit_summary");
       res.json(results);
@@ -108,7 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/profit-summary/monthly`, async (req, res) => {
+  app.get(`${apiRouter}/reports/profit-summary/monthly`, requireAuth, async (req, res) => {
     try {
       const results = await storage.getReportData("monthly_profit_summary");
       res.json(results);
@@ -118,7 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/profit-by-customer`, async (req, res) => {
+  app.get(`${apiRouter}/reports/profit-by-customer`, requireAuth, async (req, res) => {
     try {
       const results = await storage.getReportData("profit_by_customer");
       res.json(results);
@@ -128,7 +128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/profit-by-vendor`, async (req, res) => {
+  app.get(`${apiRouter}/reports/profit-by-vendor`, requireAuth, async (req, res) => {
     try {
       const results = await storage.getReportData("profit_by_vendor");
       res.json(results);
@@ -138,7 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/transaction-status`, async (req, res) => {
+  app.get(`${apiRouter}/reports/transaction-status`, requireAuth, async (req, res) => {
     try {
       const results = await storage.getReportData("transaction_status_report");
       res.json(results);
@@ -148,7 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/outstanding-balances`, async (req, res) => {
+  app.get(`${apiRouter}/reports/outstanding-balances`, requireAuth, async (req, res) => {
     try {
       const results = await storage.getReportData("outstanding_balances");
       res.json(results);
@@ -158,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/customer-detailed-transactions`, async (req, res) => {
+  app.get(`${apiRouter}/reports/customer-detailed-transactions`, requireAuth, async (req, res) => {
     try {
       const customerId = req.query.customerId ? Number(req.query.customerId) : undefined;
       const results = await storage.getReportData("customer_detailed_transactions", { customerId });
@@ -169,7 +169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/vendor-detailed-transactions`, async (req, res) => {
+  app.get(`${apiRouter}/reports/vendor-detailed-transactions`, requireAuth, async (req, res) => {
     try {
       const vendorId = req.query.vendorId as string | undefined;
       const results = await storage.getReportData("vendor_detailed_transactions", { vendorId });
