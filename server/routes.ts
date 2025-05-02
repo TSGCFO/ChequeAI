@@ -48,7 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get business summary
-  app.get(`${apiRouter}/summary`, async (req, res) => {
+  app.get(`${apiRouter}/summary`, requireAuth, async (req, res) => {
     try {
       // Try to use direct database connection first
       const { getBusinessSummary } = await import('./direct-db');
@@ -68,7 +68,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Reports endpoints
-  app.get(`${apiRouter}/reports/customer-balances`, async (req, res) => {
+  app.get(`${apiRouter}/reports/customer-balances`, requireAuth, async (req, res) => {
     try {
       const results = await storage.getReportData("customer_balances");
       res.json(results);
@@ -78,7 +78,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get(`${apiRouter}/reports/vendor-balances`, async (req, res) => {
+  app.get(`${apiRouter}/reports/vendor-balances`, requireAuth, async (req, res) => {
     try {
       const results = await storage.getReportData("vendor_balances");
       res.json(results);
