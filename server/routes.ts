@@ -646,21 +646,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Telegram webhook endpoint for production deployments
-  app.post('/telegram-webhook', express.json(), (req, res) => {
+  app.post('/telegram-webhook', express.json(), async (req, res) => {
     // Pass the update to the bot API
     if (process.env.TELEGRAM_BOT_TOKEN) {
       try {
-        // Import needed only in this route to avoid initialization conflicts
-        const { handleWebhookUpdate } = require('./services/telegram');
+        // Import handleWebhookUpdate dynamically to avoid circular dependencies
+        const { handleWebhookUpdate } = await import('./services/telegram');
         handleWebhookUpdate(req.body);
+        // Always respond with 200 OK to Telegram webhook calls
         res.sendStatus(200);
       } catch (error) {
         console.error('Error handling Telegram webhook:', error);
-        res.sendStatus(500);
+        // Still respond with 200 OK to avoid Telegram retrying the webhook immediately
+        res.sendStatus(200);
       }
     } else {
       console.log('Telegram webhook received but no token is configured');
-      res.sendStatus(404);
+      // Return 200 even if token is not configured to avoid uncessary retries
+      res.sendStatus(200);
     }
   });
 

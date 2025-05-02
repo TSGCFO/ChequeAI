@@ -22,13 +22,22 @@ let isReconnecting = false;
 const isDeployedEnvironment = process.env.REPLIT_DEPLOYMENT === 'true' || 
                              process.env.NODE_ENV === 'production';
 
-// Check if we should run the Telegram bot
-// Always enable the Telegram bot if a token is available
-const shouldRunTelegramBot = telegramToken && 
-  process.env.DISABLE_TELEGRAM_BOT !== 'true';
+// In production with Replit, we should always use webhooks for Telegram bot
+// Otherwise in development, we can use polling
+const shouldUseWebhooks = isDeployedEnvironment && process.env.TELEGRAM_WEBHOOK_URL;
+
+// Check if we should run the Telegram bot in polling mode
+// We should not run polling if we're using webhooks
+const shouldRunTelegramBotPolling = telegramToken && 
+  process.env.DISABLE_TELEGRAM_BOT !== 'true' &&
+  !shouldUseWebhooks;
+
+// Flag to indicate if we should initialize the bot at all
+// Even in webhook mode, we need to initialize the bot
+const shouldInitBot = telegramToken && process.env.DISABLE_TELEGRAM_BOT !== 'true';
 
 // Try to initialize the bot if token is available and we should run it
-if (shouldRunTelegramBot) {
+if (shouldInitBot) {
   try {
     console.log("Initializing Telegram bot");
     
@@ -513,7 +522,7 @@ export function handleWebhookUpdate(update: any) {
  * Attempts to reconnect the telegram bot
  */
 function reconnectBot() {
-  if (isReconnecting || !shouldRunTelegramBot || !telegramToken) {
+  if (isReconnecting || !shouldRunTelegramBotPolling || !telegramToken) {
     return;
   }
 
