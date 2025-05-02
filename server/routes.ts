@@ -320,7 +320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create customer
-  app.post(`${apiRouter}/customers`, async (req, res) => {
+  app.post(`${apiRouter}/customers`, requireAuth, async (req, res) => {
     try {
       const validatedData = insertCustomerSchema.parse(req.body);
       const customer = await storage.createCustomer(validatedData);
@@ -335,7 +335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update customer
-  app.patch(`${apiRouter}/customers/:id`, async (req, res) => {
+  app.patch(`${apiRouter}/customers/:id`, requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertCustomerSchema.partial().parse(req.body);
@@ -356,7 +356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete customer
-  app.delete(`${apiRouter}/customers/:id`, async (req, res) => {
+  app.delete(`${apiRouter}/customers/:id`, requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteCustomer(id);
@@ -388,7 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all vendors
-  app.get(`${apiRouter}/vendors`, async (req, res) => {
+  app.get(`${apiRouter}/vendors`, requireAuth, async (req, res) => {
     try {
       const vendors = await storage.getVendors();
       res.json(vendors);
@@ -399,7 +399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get vendor by ID
-  app.get(`${apiRouter}/vendors/:id`, async (req, res) => {
+  app.get(`${apiRouter}/vendors/:id`, requireAuth, async (req, res) => {
     try {
       const id = req.params.id;
       const vendor = await storage.getVendor(id);
@@ -416,7 +416,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create vendor
-  app.post(`${apiRouter}/vendors`, async (req, res) => {
+  app.post(`${apiRouter}/vendors`, requireAuth, async (req, res) => {
     try {
       const validatedData = insertVendorSchema.parse(req.body);
       const vendor = await storage.createVendor(validatedData);
@@ -431,7 +431,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update vendor
-  app.patch(`${apiRouter}/vendors/:id`, async (req, res) => {
+  app.patch(`${apiRouter}/vendors/:id`, requireAuth, async (req, res) => {
     try {
       const id = req.params.id;
       const validatedData = insertVendorSchema.partial().parse(req.body);
@@ -452,7 +452,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete vendor
-  app.delete(`${apiRouter}/vendors/:id`, async (req, res) => {
+  app.delete(`${apiRouter}/vendors/:id`, requireAuth, async (req, res) => {
     try {
       const id = req.params.id;
       const success = await storage.deleteVendor(id);
@@ -469,7 +469,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Document processing with Tesseract
-  app.post(`${apiRouter}/process-document`, upload.single('document'), async (req, res) => {
+  app.post(`${apiRouter}/process-document`, requireAuth, upload.single('document'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No document uploaded" });
@@ -491,7 +491,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // AI-powered document processing using OpenAI vision model
-  app.post(`${apiRouter}/process-cheque`, upload.single('document'), async (req, res) => {
+  app.post(`${apiRouter}/process-cheque`, requireAuth, upload.single('document'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No document uploaded" });
